@@ -1,26 +1,190 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+ * Mimori design tokens
+ * --------------------
+ * 1. Brand palette  — fixed HEX values, identical in every theme.
+ * 2. Semantic roles — map the palette onto UI meaning; these are the only
+ *    colour tokens components should use. Re-mapped per theme below.
+ * 3. Status colours — five states with foreground / surface / border pairs.
+ *
+ * Theme switching is driven by `prefers-color-scheme`. A manual switcher can
+ * later override the same semantic variables with `[data-theme="light|dark"]`
+ * without touching component code.
+ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  color-scheme: light;
+
+  /* 1. Brand palette — do not alter these values */
+  --brand-rose-pink: #E88EAD;
+  --brand-hot-pink: #FF69B4;
+  --brand-candy-pink: #FF4FA3;
+  --brand-deep-candy-pink: #F02E8D;
+  --brand-soft-white: #FFF8FA;
+  --brand-blush-pink: #F9E1EA;
+  --brand-warm-charcoal: #49343D;
+  --brand-dusty-rose: #C77B91;
+  --brand-white: #FFFFFF;
+
+  /* Typography — font files are self-hosted through next/font */
+  --font-body: var(--font-roboto), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --font-script: var(--font-caveat), "Bradley Hand", "Segoe Script", cursive;
+
+  /* 2. Semantic roles — light theme */
+  --background: var(--brand-hot-pink);
+  --surface: var(--brand-soft-white);
+  --surface-muted: var(--brand-blush-pink);
+  --border: #F0CDDB;
+  --heading: var(--brand-warm-charcoal);
+  --foreground: var(--brand-warm-charcoal);
+  --muted-foreground: #6E5862;
+  --primary: var(--brand-candy-pink);
+  --primary-hover: var(--brand-deep-candy-pink);
+  --primary-foreground: var(--brand-white);
+  --accent: var(--brand-dusty-rose);
+  --accent-foreground: var(--brand-warm-charcoal);
+  --ring: var(--brand-candy-pink);
+
+  /* 3. Status colours — light theme */
+  --success: #1F6B45;
+  --success-surface: #E3F4EA;
+  --success-border: #A9DCC0;
+  --warning: #7A4A00;
+  --warning-surface: #FDF0D5;
+  --warning-border: #EBCB85;
+  --danger: #9B1C39;
+  --danger-surface: #FBE3E9;
+  --danger-border: #F0AFC0;
+  --info: #1F4E79;
+  --info-surface: #E2EFF8;
+  --info-border: #A9CBE8;
+  --neutral: #4A3A42;
+  --neutral-surface: #F1E7EB;
+  --neutral-border: #D9C7CE;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+
+    /* Semantic roles — dark theme. Brand palette above is untouched. */
+    /* Page background is the same Hot Pink in both themes (D-010). */
+    --background: var(--brand-hot-pink);
+    --surface: #2A1F24;
+    --surface-muted: #33262C;
+    --border: #4A3A42;
+    --heading: var(--brand-soft-white);
+    --foreground: #F7EDF1;
+    --muted-foreground: #C9B3BC;
+    --primary: var(--brand-candy-pink);
+    --primary-hover: var(--brand-deep-candy-pink);
+    --primary-foreground: var(--brand-white);
+    --accent: var(--brand-dusty-rose);
+    --accent-foreground: var(--brand-white);
+    --ring: var(--brand-candy-pink);
+
+    /* Status colours — dark theme */
+    --success: #9BE8BE;
+    --success-surface: #1B3A2A;
+    --success-border: #2F6A4A;
+    --warning: #F5CE7A;
+    --warning-surface: #3A2E14;
+    --warning-border: #6B5324;
+    --danger: #FFA6B9;
+    --danger-surface: #3D1A23;
+    --danger-border: #6E2C3B;
+    --info: #9FD0F5;
+    --info-surface: #16303F;
+    --info-border: #2A5570;
+    --neutral: #D9C7CE;
+    --neutral-surface: #2E262B;
+    --neutral-border: #4A3A42;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/*
+ * Expose tokens to Tailwind so utilities such as `bg-surface`, `text-heading`,
+ * `border-border` or `font-decorative` reference the semantic variables and
+ * follow the active theme automatically. `inline` keeps the variable
+ * reference in the generated CSS instead of freezing a value.
+ */
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-decorative: var(--font-script);
+
+  /* Brand palette utilities */
+  --color-rose-pink: var(--brand-rose-pink);
+  --color-candy-pink: var(--brand-candy-pink);
+  --color-deep-candy-pink: var(--brand-deep-candy-pink);
+  --color-soft-white: var(--brand-soft-white);
+  --color-blush-pink: var(--brand-blush-pink);
+  --color-warm-charcoal: var(--brand-warm-charcoal);
+  --color-dusty-rose: var(--brand-dusty-rose);
+
+  /* Semantic utilities */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-heading: var(--heading);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+
+  /* Status utilities */
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-success-border: var(--success-border);
+  --color-warning: var(--warning);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-border: var(--danger-border);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --color-info-border: var(--info-border);
+  --color-neutral: var(--neutral);
+  --color-neutral-surface: var(--neutral-surface);
+  --color-neutral-border: var(--neutral-border);
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--heading);
+  }
+
+  /* Decorative/romantic type is opt-in; body text stays in Roboto. */
+  .font-decorative {
+    font-family: var(--font-script);
+  }
+
+  ::selection {
+    background-color: var(--brand-candy-pink);
+    color: var(--brand-white);
+  }
+
+  /* Low-specificity focus ring so components can override it deliberately. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
