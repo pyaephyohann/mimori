@@ -47,6 +47,21 @@
   --accent-foreground: var(--brand-warm-charcoal);
   --ring: var(--brand-candy-pink);
 
+  /* Paper — polaroid and scrapbook cards. Deliberately the same in both
+     themes: the photos sit on white paper, as in the reference. */
+  --polaroid-radius: 4px;
+  --paper: var(--brand-soft-white);
+  --paper-foreground: var(--brand-warm-charcoal);
+  --paper-edge: var(--brand-blush-pink);
+
+  /* Hero carousel frame — the rounded container the running border wraps: a
+     static white edge, a soft halo, and a running gradient built only from the
+     page's own pink. No new pink is introduced here: every stop is the brand
+     Hot Pink or a tint of it, mixed toward white inside the gradient. */
+  --carousel-radius: 28px;
+  --carousel-glow: rgba(255, 255, 255, 0.42);
+  --run-pink: var(--brand-hot-pink);
+
   /* 3. Status colours — light theme */
   --success: #1F6B45;
   --success-surface: #E3F4EA;
@@ -138,6 +153,11 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-ring: var(--ring);
 
+  /* Paper — constant across themes */
+  --color-paper: var(--paper);
+  --color-paper-foreground: var(--paper-foreground);
+  --color-paper-edge: var(--paper-edge);
+
   /* Status utilities */
   --color-success: var(--success);
   --color-success-surface: var(--success-surface);
@@ -186,5 +206,142 @@
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+}
+
+/*
+ * Scrapbook primitives
+ * --------------------
+ * Shared by the polaroid frames, gallery and decorative stickers. Kept here
+ * rather than repeated per component so tilt, hover and motion behave
+ * identically everywhere, and so reduced-motion is handled in one place.
+ */
+@layer components {
+  /* Tilt is data-driven: callers set `--tilt` per polaroid. */
+  .scrapbook-tilt {
+    transform: rotate(var(--tilt, 0deg));
+  }
+
+  .scrapbook-lift {
+    transition:
+      transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 380ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scrapbook-lift:hover {
+      transform: rotate(0deg) translateY(-6px);
+    }
+  }
+
+  .scrapbook-float {
+    animation: mimori-float 7s ease-in-out infinite;
+  }
+
+  .scrapbook-sway {
+    animation: mimori-sway 9s ease-in-out infinite;
+  }
+}
+
+@keyframes mimori-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@keyframes mimori-sway {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+/* Decoration is optional: stop it entirely when motion is unwelcome. */
+@media (prefers-reduced-motion: reduce) {
+  .scrapbook-float,
+  .scrapbook-sway {
+    animation: none;
+  }
+
+  .scrapbook-lift {
+    transition: none;
+  }
+
+  .scrapbook-lift:hover {
+    transform: rotate(0deg);
+  }
+}
+
+/*
+ * Running border
+ * --------------
+ * A stream of pink light travelling around the hero carousel's outer frame.
+ * Each ring is masked to its own padding band, so only a thin outline of the
+ * rotating gradient shows and the border follows the frame's rounded corners
+ * instead of drawing a separate rectangle around it. Two layers share one
+ * rotation: a wide, dim band for the glow and a crisp core. The gradient's
+ * first and last stops are the same colour, so the loop has no seam. Every stop
+ * is the page's own Hot Pink or a tint of it, so the stream matches the canvas.
+ *
+ * Both rings are positioned (`inset: 0`) inside the carousel frame, which
+ * supplies `--carousel-radius` and the outer box-shadow bloom.
+ */
+@layer components {
+  .scrapbook-run-ring {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+    border-radius: var(--carousel-radius);
+    padding: 3px;
+    pointer-events: none;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  .scrapbook-run-ring--halo {
+    padding: 8px;
+    opacity: 0.5;
+  }
+
+  .scrapbook-run-spin {
+    position: absolute;
+    top: -80%;
+    left: -80%;
+    width: 260%;
+    height: 260%;
+    border-radius: 50%;
+    will-change: transform;
+    /* The solid colour is the fallback where `color-mix()` is unsupported. */
+    background-color: var(--run-pink);
+    background-image: conic-gradient(
+      from 0deg,
+      color-mix(in srgb, var(--run-pink) 40%, white) 0deg,
+      color-mix(in srgb, var(--run-pink) 72%, white) 70deg,
+      var(--run-pink) 150deg,
+      color-mix(in srgb, var(--run-pink) 84%, white) 235deg,
+      color-mix(in srgb, var(--run-pink) 40%, white) 360deg
+    );
+  }
+}
+
+/* Masks are what make the border read as a border; without them the ring
+   would paint over the photo, so it is dropped entirely. */
+@supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
+  .scrapbook-run-ring {
+    display: none;
   }
 }

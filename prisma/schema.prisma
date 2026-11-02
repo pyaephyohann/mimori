@@ -1,0 +1,113 @@
+// Mimori data model.
+//
+// Global by design: Mimori is a single shared collection, so no model carries a
+// user owner. There is deliberately no User, Account or Session model; adding
+// multi-user ownership later is a schema change, not a configuration change.
+//
+// Images live in Cloudinary; PostgreSQL stores only references and metadata.
+// Never add binary image data, Base64 content or file bytes to these models.
+//
+// Conventions: Prisma defaults (cuid ids, camelCase columns, model name as
+// table name). Timestamps are stored in UTC.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 no longer accepts `url` here. The connection URL is read from
+  // DATABASE_URL in prisma7.config.ts (which loads .env).
+}
+
+/// Distinguishes a regular gallery photo from a Photo Booth capture.
+/// Both share the same Photo table and the same Cloudinary storage, so Photo
+/// Booth needs no separate image table; it is a filtered view of Photo.
+enum PhotoKind {
+  GALLERY
+  PHOTO_BOOTH
+}
+
+/// A folder that groups photos across the whole application.
+///
+/// Names are globally unique. With a single shared collection there is no
+/// tenant to scope a duplicate to, and two folders called "Trips" would be
+/// indistinguishable in navigation, so the database enforces one of each name.
+/// Rename a folder rather than allowing a duplicate.
+model Folder {
+  id          String   @id @default(cuid())
+  /// Globally unique within Mimori.
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  photos Photo[]
+}
+
+/// Photo metadata. The image itself is stored in Cloudinary and referenced here.
+model Photo {
+  id       String    @id @default(cuid())
+  /// Null means the photo is unfiled; it still belongs to the gallery.
+  folderId String?
+  kind     PhotoKind @default(GALLERY)
+  /// Cloudinary public id, used to transform or delete the asset.
+  publicId String    @unique
+  /// Cloudinary secure (https) delivery URL.
+  secureUrl String
+  caption   String?
+  /// Original filename, when the upload provided one.
+  fileName  String?
+  width     Int?
+  height    Int?
+  mimeType  String?
+  /// File size in bytes.
+  fileSize  Int?
+  /// When the photo was taken (EXIF or user-supplied), not when it was uploaded.
+  takenAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Deleting a folder keeps its photos and moves them to "unfiled".
+  folder      Folder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  widgetItems WidgetPhoto[]
+
+  @@index([kind, createdAt])
+  @@index([folderId, createdAt])
+  @@index([createdAt])
+}
+
+/// A widget that displays a chosen set of photos.
+model Widget {
+  id        String   @id @default(cuid())
+  name      String
+  /// Widget type, e.g. a photo frame or slideshow. Values are defined by the
+  /// application layer; no type is fixed yet.
+  type      String
+  /// Widget-specific settings, validated by the application.
+  config    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  photos WidgetPhoto[]
+
+  @@index([type])
+}
+
+/// Photos selected for a widget, in display order.
+/// A photo can appear in many widgets; a widget cannot contain the same photo twice.
+model WidgetPhoto {
+  widgetId String
+  photoId  String
+  /// Display order inside the widget; ties are broken by photoId.
+  position Int      @default(0)
+  addedAt  DateTime @default(now())
+
+  widget Widget @relation(fields: [widgetId], references: [id], onDelete: Cascade)
+  photo  Photo  @relation(fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@id([widgetId, photoId])
+  @@index([widgetId, position])
+  @@index([photoId])
+}
