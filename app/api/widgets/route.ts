@@ -1,8 +1,6 @@
-import { photos } from "@/lib/photos";
+import { loadPhotoIdSet } from "@/lib/gallery-photos";
 import { createWidget, listWidgets } from "@/lib/widgets/server";
 import { parseCreate } from "@/lib/widgets/validate";
-
-const allowedPhotoIds = new Set(photos.map((photo) => photo.id));
 
 const STORE_UNAVAILABLE = "The widget store is unavailable right now.";
 
@@ -30,13 +28,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Expected a JSON body." }, { status: 400 });
   }
 
-  const parsed = parseCreate(body, allowedPhotoIds);
-
-  if (!parsed.ok) {
-    return Response.json({ error: parsed.error }, { status: 400 });
-  }
-
   try {
+    // Only photos that are actually in the gallery may be used in a widget.
+    const parsed = parseCreate(body, await loadPhotoIdSet());
+
+    if (!parsed.ok) {
+      return Response.json({ error: parsed.error }, { status: 400 });
+    }
+
     const widget = await createWidget(parsed.value);
 
     return Response.json({ widget }, { status: 201 });

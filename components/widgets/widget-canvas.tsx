@@ -11,7 +11,10 @@ import {
   type RefObject,
 } from "react";
 
+import { useGalleryPhotos } from "@/components/gallery/gallery-photos-provider";
 import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
+import { useToast } from "@/components/toast/toast-provider";
+import type { Photo } from "@/lib/photo";
 import {
   SIZE_DIMENSIONS,
   WIDGET_SIZES,
@@ -42,6 +45,7 @@ type PlacedWidgetProps = {
   canvasWidth: number;
   others: ReturnType<typeof boxAt>[];
   boundsRef: RefObject<HTMLDivElement | null>;
+  photos: readonly Photo[];
   onMove: (id: string, box: { x: number; y: number }) => void;
   onResize: (id: string) => void;
   onEdit: (id: string) => void;
@@ -53,6 +57,7 @@ type PlacedWidgetProps = {
 function PlacedWidget({
   widget,
   canvasWidth,
+  photos,
   others,
   boundsRef,
   onMove,
@@ -140,7 +145,7 @@ function PlacedWidget({
       {/* Content never takes pointer events, so a drag can start anywhere on
           the piece and a photo can never swallow the gesture. */}
       <div className="pointer-events-none relative h-full w-full select-none">
-        <WidgetRenderer config={widget.config} />
+        <WidgetRenderer config={widget.config} photos={photos} />
       </div>
 
       <button
@@ -233,6 +238,26 @@ export function WidgetCanvas() {
     setCanvasWidth,
     reload,
   } = useWidgets();
+  // The widgets' photos come from the gallery, so a widget can only show a
+  // picture the Gallery holds.
+  const { photos } = useGalleryPhotos();
+  const { showToast } = useToast();
+
+  // A removal is optimistic in the store, so the outcome is reported only once
+  // the server has answered: the canvas and the toast never disagree.
+  const remove = useCallback(
+    async (id: string) => {
+      const result = await removeWidget(id);
+
+      if (result.ok) {
+        showToast("Widget removed successfully.");
+        return;
+      }
+
+      showToast(result.error ?? "That widget could not be removed.", "error");
+    },
+    [removeWidget, showToast],
+  );
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -343,11 +368,10 @@ export function WidgetCanvas() {
           <div className="flex flex-col items-center justify-center gap-1.5 py-12 text-center">
             <BowSticker className="text-2xl" />
             <p className="font-decorative text-xl text-paper-foreground">
-              Nothing pinned yet
+              Nothing here yet
             </p>
             <p className="max-w-xs text-xs text-paper-foreground/60">
-              Your scrapbook desktop is open. Pin a polaroid, a love note or a
-              little counter with “+ Add Widgets” above.
+              Add your first widget with + Add Widgets.
             </p>
           </div>
         ) : null}
@@ -358,12 +382,13 @@ export function WidgetCanvas() {
                 key={widget.id}
                 widget={widget}
                 canvasWidth={canvasWidth}
+                photos={photos}
                 others={boxes.filter((_box, boxIndex) => boxIndex !== index)}
                 boundsRef={canvasRef}
                 onMove={moveWidget}
                 onResize={cycleSize}
                 onEdit={openEdit}
-                onRemove={removeWidget}
+                onRemove={remove}
                 onForward={(id) => reorderWidget(id, "forward")}
                 onBackward={(id) => reorderWidget(id, "backward")}
               />

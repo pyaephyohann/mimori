@@ -3,7 +3,7 @@
  *
  * Shared by the browser (style picker, previews) and the server (validation),
  * so it contains no React, no database code and no photo imports. Photo
- * references are ids from `lib/photos.ts`, the gallery's own manifest.
+ * references are gallery `Photo` ids, the app's only image source.
  */
 
 export type WidgetKind =
@@ -31,7 +31,7 @@ export type WidgetPosition = {
  */
 export type WidgetConfig = {
   kind: WidgetKind;
-  /** Manifest ids (`lib/photos.ts`) in display order. */
+  /** Gallery `Photo` ids in display order. */
   photoIds: string[];
   /** Love Note copy, or a short optional caption for the framed widgets. */
   text: string;

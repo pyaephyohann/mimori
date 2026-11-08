@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "../db";
-import { photos } from "../photos";
+import { loadPhotoIdSet } from "../gallery-photos";
 import {
   clampCoordinate,
   getCatalogEntry,
@@ -20,11 +20,10 @@ import type { WidgetDraft, WidgetPatch } from "./validate.ts";
  * size and painter's order. Keeping the layout in JSON means the approved
  * schema needs no migration, and the global (ownerless) model stays as it is.
  *
- * Photo references are ids from `lib/photos.ts` — the gallery's own source —
- * so a widget never duplicates an image.
+ * Photo references are gallery `Photo` ids, checked against the photo table on
+ * every read, so a widget never duplicates an image and a photo that has gone
+ * away simply drops out of the layout.
  */
-
-const allowedPhotoIds = new Set(photos.map((photo) => photo.id));
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,7 +31,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Reads a stored config defensively: rows written by an older build must not
  *  break the page. Returns `null` when the row cannot be a widget at all. */
-function readConfig(type: string, raw: unknown): WidgetConfig | null {
+function readConfig(
+  type: string,
+  raw: unknown,
+  allowedPhotoIds: ReadonlySet<string>,
+): WidgetConfig | null {
   if (!isWidgetKind(type)) {
     return null;
   }
@@ -76,8 +79,11 @@ type WidgetRow = {
   updatedAt: Date;
 };
 
-function toRecord(row: WidgetRow): WidgetRecord | null {
-  const config = readConfig(row.type, row.config);
+function toRecord(
+  row: WidgetRow,
+  allowedPhotoIds: ReadonlySet<string>,
+): WidgetRecord | null {
+  const config = readConfig(row.type, row.config, allowedPhotoIds);
 
   if (!config) {
     return null;
@@ -94,20 +100,26 @@ function toRecord(row: WidgetRow): WidgetRecord | null {
 }
 
 export async function listWidgets(): Promise<WidgetRecord[]> {
-  const rows = await getPrisma().widget.findMany({
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-  });
+  const [rows, allowedPhotoIds] = await Promise.all([
+    getPrisma().widget.findMany({
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    }),
+    loadPhotoIdSet(),
+  ]);
 
   return rows
-    .map(toRecord)
+    .map((row) => toRecord(row, allowedPhotoIds))
     .filter((record): record is WidgetRecord => record !== null)
     .sort((a, b) => a.config.z - b.config.z);
 }
 
 export async function getWidget(id: string): Promise<WidgetRecord | null> {
-  const row = await getPrisma().widget.findUnique({ where: { id } });
+  const [row, allowedPhotoIds] = await Promise.all([
+    getPrisma().widget.findUnique({ where: { id } }),
+    loadPhotoIdSet(),
+  ]);
 
-  return row ? toRecord(row) : null;
+  return row ? toRecord(row, allowedPhotoIds) : null;
 }
 
 export async function createWidget(draft: WidgetDraft): Promise<WidgetRecord> {
@@ -131,7 +143,7 @@ export async function createWidget(draft: WidgetDraft): Promise<WidgetRecord> {
     },
   });
 
-  const record = toRecord(row);
+  const record = toRecord(row, await loadPhotoIdSet());
 
   if (!record) {
     throw new Error("The new widget could not be read back.");
@@ -151,7 +163,8 @@ export async function updateWidget(
     return null;
   }
 
-  const current = readConfig(row.type, row.config);
+  const allowedPhotoIds = await loadPhotoIdSet();
+  const current = readConfig(row.type, row.config, allowedPhotoIds);
 
   if (!current) {
     return null;
@@ -181,17 +194,13 @@ export async function updateWidget(
     },
   });
 
-  return toRecord(updated);
+  return toRecord(updated, allowedPhotoIds);
 }
 
 export async function deleteWidget(id: string): Promise<boolean> {
-  const existing = await getPrisma().widget.findUnique({ where: { id } });
+  // A single delete keeps the check and the removal atomic: a widget removed
+  // by another request reports as missing instead of failing the lookup.
+  const { count } = await getPrisma().widget.deleteMany({ where: { id } });
 
-  if (!existing) {
-    return false;
-  }
-
-  await getPrisma().widget.delete({ where: { id } });
-
-  return true;
+  return count > 0;
 }

@@ -22,6 +22,7 @@ import {
   boxAt,
   settlePosition,
 } from "@/lib/widgets/layout";
+import { restoreWidget, sortByZ, withoutWidget } from "@/lib/widgets/list";
 
 /**
  * Client-side widget state.
@@ -68,16 +69,12 @@ type WidgetsContextValue = {
   addWidget: (draft: WidgetDraft) => Promise<Result>;
   editWidget: (id: string, edits: WidgetEdits) => Promise<Result>;
   moveWidget: (id: string, position: WidgetPosition) => void;
-  removeWidget: (id: string) => Promise<void>;
+  removeWidget: (id: string) => Promise<Result>;
   reorderWidget: (id: string, direction: "forward" | "backward") => void;
   reload: () => void;
 };
 
 const WidgetsContext = createContext<WidgetsContextValue | null>(null);
-
-function sortByZ(widgets: readonly WidgetRecord[]): WidgetRecord[] {
-  return [...widgets].sort((a, b) => a.config.z - b.config.z);
-}
 
 async function readError(response: Response): Promise<string> {
   try {
@@ -261,29 +258,34 @@ export function WidgetsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const removeWidget = useCallback(async (id: string) => {
-    let removed: WidgetRecord | undefined;
+  const removeWidget = useCallback(
+    async (id: string): Promise<Result> => {
+      const removed = widgets.find((widget) => widget.id === id);
 
-    setWidgets((current) => {
-      removed = current.find((widget) => widget.id === id);
-      return current.filter((widget) => widget.id !== id);
-    });
+      setWidgets((current) => withoutWidget(current, id));
+      setError(null);
 
-    try {
-      const response = await fetch(`/api/widgets/${id}`, { method: "DELETE" });
+      try {
+        const response = await fetch(`/api/widgets/${id}`, { method: "DELETE" });
 
-      if (!response.ok && response.status !== 404) {
-        throw new Error(await readError(response));
+        if (!response.ok && response.status !== 404) {
+          throw new Error(await readError(response));
+        }
+
+        return { ok: true };
+      } catch {
+        if (removed) {
+          setWidgets((current) => restoreWidget(current, removed));
+        }
+
+        const message = "That widget could not be removed.";
+        setError(message);
+
+        return { ok: false, error: message };
       }
-    } catch {
-      if (removed) {
-        const restore = removed;
-        setWidgets((current) => sortByZ([...current, restore]));
-      }
-
-      setError("That widget could not be removed.");
-    }
-  }, []);
+    },
+    [widgets],
+  );
 
   const reorderWidget = useCallback(
     (id: string, direction: "forward" | "backward") => {

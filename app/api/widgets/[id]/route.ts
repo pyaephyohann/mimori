@@ -1,12 +1,10 @@
-import { photos } from "@/lib/photos";
+import { loadPhotoIdSet } from "@/lib/gallery-photos";
 import {
   deleteWidget,
   getWidget,
   updateWidget,
 } from "@/lib/widgets/server";
 import { parseUpdate, parseZ } from "@/lib/widgets/validate";
-
-const allowedPhotoIds = new Set(photos.map((photo) => photo.id));
 
 const STORE_UNAVAILABLE = "The widget store is unavailable right now.";
 
@@ -32,7 +30,7 @@ export async function PATCH(request: Request, { params }: WidgetRouteContext) {
       return Response.json({ error: "That widget no longer exists." }, { status: 404 });
     }
 
-    const parsed = parseUpdate(body, current.kind, allowedPhotoIds);
+    const parsed = parseUpdate(body, current.kind, await loadPhotoIdSet());
 
     if (!parsed.ok) {
       return Response.json({ error: parsed.error }, { status: 400 });

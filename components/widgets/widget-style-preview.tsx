@@ -1,4 +1,4 @@
-import { photos } from "@/lib/photos";
+import type { Photo } from "@/lib/photo";
 import {
   getCatalogEntry,
   type WidgetConfig,
@@ -7,7 +7,7 @@ import {
 
 import { WidgetRenderer } from "./widget-renderer";
 
-function sampleConfig(kind: WidgetKind): WidgetConfig {
+function sampleConfig(kind: WidgetKind, photos: readonly Photo[]): WidgetConfig {
   const entry = getCatalogEntry(kind);
 
   return {
@@ -21,15 +21,27 @@ function sampleConfig(kind: WidgetKind): WidgetConfig {
   };
 }
 
-/** Miniature of a widget style, used by the style picker. */
-export function WidgetStylePreview({ kind }: { kind: WidgetKind }) {
+/**
+ * Miniature of a widget style, used by the style picker.
+ *
+ * Photo styles preview with the first real gallery photos. With an empty
+ * gallery they fall back to the renderer's own empty state rather than to a
+ * bundled sample picture.
+ */
+export function WidgetStylePreview({
+  kind,
+  photos,
+}: {
+  kind: WidgetKind;
+  photos: readonly Photo[];
+}) {
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none relative h-36 w-full overflow-hidden rounded-2xl bg-blush-pink/70 p-2 ring-1 ring-paper-edge"
     >
       <div className="relative h-full w-full">
-        <WidgetRenderer config={sampleConfig(kind)} />
+        <WidgetRenderer config={sampleConfig(kind, photos)} photos={photos} />
       </div>
     </div>
   );

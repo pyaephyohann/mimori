@@ -1,21 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
-  <title>Mimori</title>
-  <!-- The homepage's pink bow sticker as a vector, so it stays crisp at favicon
-       sizes. Brand values only: Candy Pink loops, Deep Candy Pink tails and
-       knot, a Soft White highlight. -->
-  <g fill="#FF4FA3">
-    <path d="M28 25.4c-4-6.8-13.6-10.8-19.4-7.2-5.2 3.2-4.6 11.4.8 15.4 5 3.8 13.6 4 18.6 1Z" />
-    <path d="M36 25.4c4-6.8 13.6-10.8 19.4-7.2 5.2 3.2 4.6 11.4-.8 15.4-5 3.8-13.6 4-18.6 1Z" />
-    <!-- Bridges the two loops behind the knot so the top edge reads unbroken. -->
-    <rect x="23.6" y="22.4" width="16.8" height="11" rx="5" />
-  </g>
-  <g fill="#F02E8D">
-    <path d="M28.2 31.4 22.4 49.2l6.2-1.6 2.6-15.8Z" />
-    <path d="M35.8 31.4 41.6 49.2l-6.2-1.6-2.6-15.8Z" />
-  </g>
-  <ellipse cx="32" cy="30.6" rx="4.6" ry="4.3" fill="#F02E8D" />
-  <g stroke="#FFF8FA" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".45">
-    <path d="M11 23.2c2.2-2.6 6.4-3.4 9.2-2.6" />
-    <path d="M53 23.2c-2.2-2.6-6.4-3.4-9.2-2.6" />
-  </g>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text
+    x="50"
+    y="76"
+    font-size="80"
+    text-anchor="middle"
+  >🎀</text>
 </svg>

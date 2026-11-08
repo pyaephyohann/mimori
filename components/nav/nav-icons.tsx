@@ -65,14 +65,6 @@ export function WidgetIcon({ className = "" }: IconProps) {
   );
 }
 
-export function MenuIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className={className} {...stroke}>
-      <path d="M4.5 8.2c4.8-.6 10.2.5 15-.4M4.5 12.4c3.9.5 9.4-.4 15 .3M4.5 16.6c5.2.6 9.6-.4 11.6.4" />
-    </svg>
-  );
-}
-
 export function PlusIcon({ className = "" }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" className={className} {...stroke}>

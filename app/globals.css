@@ -3,14 +3,15 @@
 /*
  * Mimori design tokens
  * --------------------
- * 1. Brand palette  — fixed HEX values, identical in every theme.
+ * 1. Brand palette  — fixed HEX values.
  * 2. Semantic roles — map the palette onto UI meaning; these are the only
- *    colour tokens components should use. Re-mapped per theme below.
+ *    colour tokens components should use.
  * 3. Status colours — five states with foreground / surface / border pairs.
  *
- * Theme switching is driven by `prefers-color-scheme`. A manual switcher can
- * later override the same semantic variables with `[data-theme="light|dark"]`
- * without touching component code.
+ * Mimori is light mode only. There is no theme switch and no
+ * `prefers-color-scheme` override: the operating system's dark preference
+ * cannot change a single colour, and `color-scheme: light` keeps native
+ * controls (inputs, scrollbars, select menus) light as well.
  */
 
 :root {
@@ -32,7 +33,7 @@
     "Segoe UI", sans-serif;
   --font-script: var(--font-caveat), "Bradley Hand", "Segoe Script", cursive;
 
-  /* 2. Semantic roles — light theme */
+  /* 2. Semantic roles */
   --background: var(--brand-hot-pink);
   --surface: var(--brand-soft-white);
   --surface-muted: var(--brand-blush-pink);
@@ -47,8 +48,12 @@
   --accent-foreground: var(--brand-warm-charcoal);
   --ring: var(--brand-candy-pink);
 
-  /* Paper — polaroid and scrapbook cards. Deliberately the same in both
-     themes: the photos sit on white paper, as in the reference. */
+  /* The one tint the "Our Love Story" letters travel through: white warmed
+     toward Blush Pink, never a saturated pink, so the words stay readable. */
+  --love-story-glint: #FFC9DF;
+
+  /* Paper — polaroid and scrapbook cards. The photos sit on white paper, as
+     in the reference. */
   --polaroid-radius: 4px;
   --paper: var(--brand-soft-white);
   --paper-foreground: var(--brand-warm-charcoal);
@@ -62,7 +67,7 @@
   --carousel-glow: rgba(255, 255, 255, 0.42);
   --run-pink: var(--brand-hot-pink);
 
-  /* 3. Status colours — light theme */
+  /* 3. Status colours */
   --success: #1F6B45;
   --success-surface: #E3F4EA;
   --success-border: #A9DCC0;
@@ -80,50 +85,11 @@
   --neutral-border: #D9C7CE;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    /* Semantic roles — dark theme. Brand palette above is untouched. */
-    /* Page background is the same Hot Pink in both themes (D-010). */
-    --background: var(--brand-hot-pink);
-    --surface: #2A1F24;
-    --surface-muted: #33262C;
-    --border: #4A3A42;
-    --heading: var(--brand-soft-white);
-    --foreground: #F7EDF1;
-    --muted-foreground: #C9B3BC;
-    --primary: var(--brand-candy-pink);
-    --primary-hover: var(--brand-deep-candy-pink);
-    --primary-foreground: var(--brand-white);
-    --accent: var(--brand-dusty-rose);
-    --accent-foreground: var(--brand-white);
-    --ring: var(--brand-candy-pink);
-
-    /* Status colours — dark theme */
-    --success: #9BE8BE;
-    --success-surface: #1B3A2A;
-    --success-border: #2F6A4A;
-    --warning: #F5CE7A;
-    --warning-surface: #3A2E14;
-    --warning-border: #6B5324;
-    --danger: #FFA6B9;
-    --danger-surface: #3D1A23;
-    --danger-border: #6E2C3B;
-    --info: #9FD0F5;
-    --info-surface: #16303F;
-    --info-border: #2A5570;
-    --neutral: #D9C7CE;
-    --neutral-surface: #2E262B;
-    --neutral-border: #4A3A42;
-  }
-}
-
 /*
  * Expose tokens to Tailwind so utilities such as `bg-surface`, `text-heading`,
- * `border-border` or `font-decorative` reference the semantic variables and
- * follow the active theme automatically. `inline` keeps the variable
- * reference in the generated CSS instead of freezing a value.
+ * `border-border` or `font-decorative` reference the semantic variables.
+ * `inline` keeps the variable reference in the generated CSS instead of
+ * freezing a value.
  */
 @theme inline {
   --font-sans: var(--font-body);
@@ -153,7 +119,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-ring: var(--ring);
 
-  /* Paper — constant across themes */
+  /* Paper — the scrapbook's white */
   --color-paper: var(--paper);
   --color-paper-foreground: var(--paper-foreground);
   --color-paper-edge: var(--paper-edge);
@@ -280,6 +246,51 @@
 }
 
 /*
+ * Love-story letter glint
+ * -----------------------
+ * "Our Love Story" stays pure white, and a short pool of pale pink light
+ * travels across its letters from left to right, like a highlight moving on
+ * water. Each letter renders as its own span, and each one animates its own
+ * ink colour: white, warmed briefly toward Blush Pink, then back to white, a
+ * few dozen milliseconds later than the letter before it. The offset is what
+ * makes the glint travel; the letters themselves never move, so the script
+ * type stays crisp and the heading never reflows.
+ *
+ * The previous version animated a gradient's `background-position` behind
+ * `background-clip: text`. Chromium caches that clipped text paint and never
+ * invalidates it when only the background position changes, so the animation
+ * ran while the pixels stayed put — the heading looked completely static.
+ * Animating the glyph colour is a paint change the engine always honours.
+ */
+.love-story-letter {
+  display: inline-block;
+  color: var(--brand-white);
+  animation: mimori-love-story-glint 3200ms ease-in-out infinite;
+}
+
+@keyframes mimori-love-story-glint {
+  0%,
+  6% {
+    color: var(--brand-white);
+  }
+
+  12% {
+    color: var(--love-story-glint);
+  }
+
+  18%,
+  100% {
+    color: var(--brand-white);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .love-story-letter {
+    animation: none;
+  }
+}
+
+/*
  * Running border
  * --------------
  * A stream of pink light travelling around the hero carousel's outer frame.
@@ -343,5 +354,40 @@
 @supports not ((mask-composite: exclude) or (-webkit-mask-composite: xor)) {
   .scrapbook-run-ring {
     display: none;
+  }
+}
+
+/*
+ * Hand-drawn heart, drawn on arrival
+ * ----------------------------------
+ * `HeartOutline` renders one loose path behind a page heading; the dash is the
+ * whole path, measured in user units and handed down as `--heart-length`, so
+ * animating the offset from that length to 0 draws it in a single stroke. (A
+ * `pathLength={1}` normalised dash looks equivalent but is not: CSS dash arrays
+ * are not scaled by `pathLength` in every browser, which left the heart as a
+ * one-pixel sliver.) The heading is readable the whole time because the stroke
+ * sits behind the glyphs, and reduced motion simply shows the finished heart.
+ */
+.heart-draw path {
+  stroke-dasharray: var(--heart-length, 1);
+  stroke-dashoffset: var(--heart-length, 1);
+  animation: mimori-heart-draw 1500ms cubic-bezier(0.45, 0.05, 0.35, 1) 220ms
+    forwards;
+}
+
+@keyframes mimori-heart-draw {
+  from {
+    stroke-dashoffset: var(--heart-length, 1);
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heart-draw path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }

@@ -7,7 +7,7 @@ import {
   HeartDoodle,
   SpiralDoodle,
 } from "@/components/scrapbook/doodles";
-import { photos, type Photo } from "@/lib/photos";
+import type { Photo } from "@/lib/photo";
 import { daysSince, type WidgetConfig } from "@/lib/widgets/catalog";
 
 /**
@@ -16,11 +16,21 @@ import { daysSince, type WidgetConfig } from "@/lib/widgets/catalog";
  * plate, a note and a counter — rather than one card with a new title.
  */
 
-const photosById = new Map(photos.map((photo) => [photo.id, photo]));
+/**
+ * Every layout receives the gallery's photos. Widget configs store `Photo`
+ * ids, and this is where they are resolved — a widget can only ever show a
+ * picture the Gallery actually holds.
+ */
+type BodyProps = {
+  config: WidgetConfig;
+  photos: readonly Photo[];
+};
 
-function chosenPhotos(config: WidgetConfig): Photo[] {
+function chosenPhotos(config: WidgetConfig, photos: readonly Photo[]): Photo[] {
+  const byId = new Map(photos.map((photo) => [photo.id, photo]));
+
   return config.photoIds
-    .map((id) => photosById.get(id))
+    .map((id) => byId.get(id))
     .filter((photo): photo is Photo => photo !== undefined);
 }
 
@@ -47,8 +57,8 @@ function MissingPhotos({ children }: { children: string }) {
   );
 }
 
-function PolaroidBody({ config }: { config: WidgetConfig }) {
-  const [photo] = chosenPhotos(config);
+function PolaroidBody({ config, photos }: BodyProps) {
+  const [photo] = chosenPhotos(config, photos);
 
   if (!photo) {
     return <MissingPhotos>Pick a photo for this polaroid</MissingPhotos>;
@@ -70,8 +80,8 @@ function PolaroidBody({ config }: { config: WidgetConfig }) {
   );
 }
 
-function GridBody({ config }: { config: WidgetConfig }) {
-  const chosen = chosenPhotos(config);
+function GridBody({ config, photos }: BodyProps) {
+  const chosen = chosenPhotos(config, photos);
 
   if (chosen.length === 0) {
     return <MissingPhotos>Choose photos for this grid</MissingPhotos>;
@@ -99,8 +109,8 @@ function GridBody({ config }: { config: WidgetConfig }) {
   );
 }
 
-function FilmStripBody({ config }: { config: WidgetConfig }) {
-  const chosen = chosenPhotos(config);
+function FilmStripBody({ config, photos }: BodyProps) {
+  const chosen = chosenPhotos(config, photos);
 
   if (chosen.length === 0) {
     return <MissingPhotos>Choose photos for this film strip</MissingPhotos>;
@@ -139,15 +149,15 @@ const HEART_SLOTS = [
   { left: 59, top: 56, width: 38, rotate: 8 },
 ];
 
-function HeartCollageBody({ config }: { config: WidgetConfig }) {
-  const chosen = chosenPhotos(config);
+function HeartCollageBody({ config, photos }: BodyProps) {
+  const chosen = chosenPhotos(config, photos);
 
   if (chosen.length === 0) {
     return <MissingPhotos>Choose photos for this collage</MissingPhotos>;
   }
 
   return (
-    <div className="relative h-full overflow-hidden rounded-[4px] bg-paper p-1 shadow-[0_12px_26px_-16px_rgba(73,52,61,0.55)] ring-1 ring-paper-edge">
+    <div className="relative h-full overflow-hidden rounded-[4px] bg-white p-1 shadow-[0_12px_26px_-16px_rgba(73,52,61,0.55)] ring-1 ring-paper-edge">
       <HeartDoodle
         filled
         className="absolute top-1/2 left-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 text-blush-pink"
@@ -185,8 +195,8 @@ const STACK_OFFSETS = [
   { left: 22, top: 20 },
 ];
 
-function PhotoStackBody({ config }: { config: WidgetConfig }) {
-  const chosen = chosenPhotos(config);
+function PhotoStackBody({ config, photos }: BodyProps) {
+  const chosen = chosenPhotos(config, photos);
 
   if (chosen.length === 0) {
     return <MissingPhotos>Choose photos to stack</MissingPhotos>;
@@ -221,8 +231,8 @@ function PhotoStackBody({ config }: { config: WidgetConfig }) {
   );
 }
 
-function MemoryFrameBody({ config }: { config: WidgetConfig }) {
-  const [photo] = chosenPhotos(config);
+function MemoryFrameBody({ config, photos }: BodyProps) {
+  const [photo] = chosenPhotos(config, photos);
 
   if (!photo) {
     return <MissingPhotos>Pick a photo for this frame</MissingPhotos>;
@@ -279,7 +289,12 @@ function OurCounterBody({ config }: { config: WidgetConfig }) {
       <SpiralDoodle className="absolute top-2 right-2 h-4 w-6 text-dusty-rose/70" />
       <HeartDoodle className="absolute bottom-2 left-2 h-5 w-5 -rotate-12 text-dusty-rose/70" />
 
-      <p className="font-decorative text-5xl leading-none text-paper-foreground">
+      {/* Only the number is pink; the placeholder dash keeps the body colour. */}
+      <p
+        className={`font-decorative text-5xl leading-none ${
+          total === null ? "text-paper-foreground" : "text-primary"
+        }`}
+      >
         {total === null ? "—" : total.toLocaleString("en-US")}
       </p>
       <p className="mt-1 text-xs font-medium text-paper-foreground/75">{label}</p>
@@ -303,20 +318,26 @@ function OurCounterBody({ config }: { config: WidgetConfig }) {
   );
 }
 
-export function WidgetRenderer({ config }: { config: WidgetConfig }) {
+export function WidgetRenderer({
+  config,
+  photos,
+}: {
+  config: WidgetConfig;
+  photos: readonly Photo[];
+}) {
   switch (config.kind) {
     case "polaroid":
-      return <PolaroidBody config={config} />;
+      return <PolaroidBody config={config} photos={photos} />;
     case "photo-grid":
-      return <GridBody config={config} />;
+      return <GridBody config={config} photos={photos} />;
     case "film-strip":
-      return <FilmStripBody config={config} />;
+      return <FilmStripBody config={config} photos={photos} />;
     case "heart-collage":
-      return <HeartCollageBody config={config} />;
+      return <HeartCollageBody config={config} photos={photos} />;
     case "photo-stack":
-      return <PhotoStackBody config={config} />;
+      return <PhotoStackBody config={config} photos={photos} />;
     case "memory-frame":
-      return <MemoryFrameBody config={config} />;
+      return <MemoryFrameBody config={config} photos={photos} />;
     case "love-note":
       return <LoveNoteBody config={config} />;
     case "our-counter":

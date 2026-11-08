@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 import {
   BowSticker,
@@ -8,10 +8,12 @@ import {
   HeartDoodle,
   SpiralDoodle,
 } from "@/components/scrapbook/doodles";
+import { PhotoPlaceholder } from "@/components/scrapbook/photo-placeholder";
 import { Polaroid } from "@/components/scrapbook/polaroid";
 import { RunningBorder } from "@/components/scrapbook/running-border";
+import { useHeroSlots } from "@/components/hero-slots-provider";
+import type { HeroSlot } from "@/lib/hero/slots";
 import { HERO_ORDER_KEY } from "@/lib/photo-order";
-import type { Photo } from "@/lib/photos";
 import { useShuffledPhotos } from "@/lib/use-shuffled-photos";
 
 /** Alternating tilts so neighbouring polaroids never look aligned. */
@@ -21,42 +23,93 @@ const arrowButton =
   "flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40";
 
 type HeroCarouselProps = {
-  photos: readonly Photo[];
+  /**
+   * The eight fixed slots. A slot with `photo: null` is empty and drawn as a
+   * colourful square — never filled with a borrowed picture.
+   */
+  slots: readonly HeroSlot[];
+  /** True when the slots could not be read; the squares stay, with a note. */
+  failed?: boolean;
 };
 
-export function HeroCarousel({ photos }: HeroCarouselProps) {
-  const ordered = useShuffledPhotos(photos, HERO_ORDER_KEY);
+/**
+ * An empty slot: the same paper frame and tilt as a polaroid, with a colourful
+ * square instead of a photo. It keeps the slide's width, snap position and the
+ * carousel's dots/arrows exactly as they are.
+ */
+function EmptyHeroSlot({
+  rotation,
+  tone,
+  bow,
+  heart,
+}: {
+  rotation: number;
+  tone: number;
+  bow: boolean;
+  heart: boolean;
+}) {
+  return (
+    <figure
+      className="scrapbook-tilt relative rounded-[var(--polaroid-radius)] bg-paper p-2.5 pb-1 shadow-[0_14px_34px_-16px_rgba(73,52,61,0.55)] ring-1 ring-paper-edge sm:p-3 sm:pb-1"
+      style={{ "--tilt": `${rotation}deg` } as CSSProperties}
+    >
+      <PhotoPlaceholder
+        tone={tone}
+        label="Empty carousel slot — pick a photo from the gallery to fill it"
+        className="rounded-[2px]"
+      />
+
+      <figcaption className="px-1.5 pt-2 pb-1.5 text-center font-decorative text-lg leading-tight text-paper-foreground/55 sm:text-xl">
+        waiting for a photo
+      </figcaption>
+
+      {bow ? (
+        <BowSticker className="absolute -top-3.5 -right-3 rotate-6 text-2xl drop-shadow-sm sm:text-3xl" />
+      ) : null}
+
+      {heart ? (
+        <HeartDoodle
+          filled
+          className="absolute -top-3 -left-3 h-7 w-7 -rotate-12 text-warm-charcoal/85"
+        />
+      ) : null}
+    </figure>
+  );
+}
+
+export function HeroCarousel({ slots, failed = false }: HeroCarouselProps) {
+  // A replacement made from the gallery is already saved; its response is the
+  // newest state, so it is shown instead of this page's render of the slots.
+  const { savedSlots } = useHeroSlots();
+  const ordered = useShuffledPhotos(savedSlots ?? slots, HERO_ORDER_KEY);
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
-  const scrollToIndex = useCallback(
-    (index: number) => {
-      const track = trackRef.current;
-      const slide = track?.children[index] as HTMLElement | undefined;
+  const scrollToIndex = useCallback((index: number) => {
+    const track = trackRef.current;
+    const slide = track?.children[index] as HTMLElement | undefined;
 
-      if (!track || !slide) {
-        return;
-      }
+    if (!track || !slide) {
+      return;
+    }
 
-      const prefersReducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
-      // Measured against the track rather than `offsetLeft`, which is relative
-      // to whichever ancestor happens to be positioned.
-      const trackRect = track.getBoundingClientRect();
-      const slideRect = slide.getBoundingClientRect();
+    // Measured against the track rather than `offsetLeft`, which is relative
+    // to whichever ancestor happens to be positioned.
+    const trackRect = track.getBoundingClientRect();
+    const slideRect = slide.getBoundingClientRect();
 
-      track.scrollTo({
-        left:
-          track.scrollLeft +
-          (slideRect.left - trackRect.left) -
-          (track.clientWidth - slideRect.width) / 2,
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-      });
-    },
-    [],
-  );
+    track.scrollTo({
+      left:
+        track.scrollLeft +
+        (slideRect.left - trackRect.left) -
+        (track.clientWidth - slideRect.width) / 2,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, []);
 
   // Keep the dots in sync with native scrolling (touch swipe, trackpad, buttons).
   useEffect(() => {
@@ -74,9 +127,7 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
 
       Array.from(track.children).forEach((child, index) => {
         const slideRect = (child as HTMLElement).getBoundingClientRect();
-        const distance = Math.abs(
-          slideRect.left + slideRect.width / 2 - centre,
-        );
+        const distance = Math.abs(slideRect.left + slideRect.width / 2 - centre);
 
         if (distance < nearestDistance) {
           nearestDistance = distance;
@@ -87,10 +138,9 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
       setActive(nearest);
     };
 
-    // A fresh visit opens on the first photo of the new order. Browsers
-    // restore a scroll container's offset on reload, which would otherwise
-    // leave the dots and buttons pointing at a different slide than the one
-    // on screen.
+    // A fresh visit opens on the first slot of the new order. Browsers restore
+    // a scroll container's offset on reload, which would otherwise leave the
+    // dots and buttons pointing at a different slide than the one on screen.
     const startAtFirstPhoto = () => {
       track.scrollTo({ left: 0, behavior: "auto" });
       syncActive();
@@ -111,21 +161,6 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
   }, [ordered.length]);
 
   const lastIndex = ordered.length - 1;
-
-  if (ordered.length === 0) {
-    return (
-      <section aria-labelledby="hero-heading">
-        <h1 id="hero-heading" className="sr-only">
-          Mimori — our love story
-        </h1>
-        <p className="mx-auto max-w-sm bg-paper px-6 py-10 text-center font-decorative text-xl text-paper-foreground shadow-sm">
-          No photos yet —
-          <br />
-          our story starts soon.
-        </p>
-      </section>
-    );
-  }
 
   return (
     <section aria-labelledby="hero-heading" className="relative">
@@ -155,10 +190,10 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
         </div>
 
         {/* The wrapper gives the track's percentage padding a width to resolve
-            against, so the first and last polaroids sit exactly centred. */}
+            against, so the first and last slides sit exactly centred. */}
         <div className="w-full [container-type:inline-size]">
           {/* Inline padding is derived from the slide width: neighbours peek at
-              both edges while the active polaroid stays centred. */}
+              both edges while the active slide stays centred. */}
           <div
             ref={trackRef}
             tabIndex={0}
@@ -178,21 +213,30 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
             }}
             className="scrapbook-scroll flex snap-x snap-mandatory gap-6 overflow-x-auto pt-4 pb-6 [--slide-w:86cqi] [padding-inline:calc((100%-var(--slide-w))/2)] [scrollbar-width:none] sm:gap-10 sm:pt-8 sm:[--slide-w:26rem] lg:[--slide-w:30rem] [&::-webkit-scrollbar]:hidden"
           >
-            {ordered.map((photo, index) => (
+            {ordered.map((slot, index) => (
               <div
-                key={photo.id}
+                key={slot.id}
                 className="w-[var(--slide-w)] shrink-0 snap-center"
-                aria-label={`Photo ${index + 1} of ${ordered.length}`}
+                aria-label={`Slide ${index + 1} of ${ordered.length}`}
               >
-                <Polaroid
-                  photo={photo}
-                  rotation={TILTS[index % TILTS.length]}
-                  sizes="(max-width: 640px) 86vw, (max-width: 1024px) 416px, 480px"
-                  eager={index === 0}
-                  bow={index % 2 === 0}
-                  heart={index % 3 === 0}
-                  interactive
-                />
+                {slot.photo ? (
+                  <Polaroid
+                    photo={{ ...slot.photo, caption: slot.title || slot.photo.caption }}
+                    rotation={TILTS[index % TILTS.length]}
+                    sizes="(max-width: 640px) 86vw, (max-width: 1024px) 416px, 480px"
+                    eager={index === 0}
+                    bow={index % 2 === 0}
+                    heart={index % 3 === 0}
+                    interactive
+                  />
+                ) : (
+                  <EmptyHeroSlot
+                    rotation={TILTS[index % TILTS.length]}
+                    tone={index}
+                    bow={index % 2 === 0}
+                    heart={index % 3 === 0}
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -206,12 +250,7 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
             aria-label="Previous photo"
             className={arrowButton}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-              className="h-5 w-5"
-            >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
               <path
                 d="M15 5 8 12l7 7"
                 stroke="currentColor"
@@ -223,17 +262,19 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
           </button>
 
           <ul className="flex items-center gap-2">
-            {ordered.map((photo, index) => (
-              <li key={photo.id}>
+            {ordered.map((slot, index) => (
+              <li key={slot.id}>
                 <button
                   type="button"
                   onClick={() => scrollToIndex(index)}
-                  aria-label={`Show photo ${index + 1} of ${ordered.length}`}
+                  aria-label={`Show slide ${index + 1} of ${ordered.length}`}
                   aria-current={index === active ? "true" : undefined}
                   className={`block h-2.5 cursor-pointer rounded-full transition-all ${
                     index === active
                       ? "w-6 bg-primary"
-                      : "w-2.5 bg-surface/80 ring-1 ring-border hover:bg-surface"
+                      : slot.photo
+                        ? "w-2.5 bg-surface/80 ring-1 ring-border hover:bg-surface"
+                        : "w-2.5 bg-surface/50 ring-1 ring-primary/40 hover:bg-surface"
                   }`}
                 />
               </li>
@@ -247,12 +288,7 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
             aria-label="Next photo"
             className={arrowButton}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-              className="h-5 w-5"
-            >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
               <path
                 d="m9 5 7 7-7 7"
                 stroke="currentColor"
@@ -264,6 +300,15 @@ export function HeroCarousel({ photos }: HeroCarouselProps) {
           </button>
         </div>
       </div>
+
+      {failed ? (
+        <p
+          role="status"
+          className="mt-3 text-center text-xs text-[var(--brand-white)]/90"
+        >
+          The carousel could not be loaded right now.
+        </p>
+      ) : null}
     </section>
   );
 }

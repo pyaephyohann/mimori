@@ -2,10 +2,17 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import Image from "next/image";
-import { useEffect, useId, useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 
+import { useGalleryPhotos } from "@/components/gallery/gallery-photos-provider";
+import { useToast } from "@/components/toast/toast-provider";
+import { uploadPhotoFile } from "@/lib/gallery-upload-client";
 import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
-import { photos } from "@/lib/photos";
+import {
+  PHOTO_PLACEHOLDER_COUNT,
+  PhotoPlaceholder,
+} from "@/components/scrapbook/photo-placeholder";
 import {
   SIZE_DIMENSIONS,
   SIZE_LABELS,
@@ -18,6 +25,8 @@ import {
   type WidgetSize,
 } from "@/lib/widgets/catalog";
 
+import { widgetUploadFileError } from "@/lib/widgets/photo-upload-selection";
+
 import { useWidgets } from "./widgets-provider";
 import { WidgetRenderer } from "./widget-renderer";
 import { WidgetStylePreview } from "./widget-style-preview";
@@ -28,9 +37,8 @@ type Step = "style" | "photos" | "customize";
  * The Add Widgets flow.
  *
  * Style, photos and configuration are separate steps so the photo count can be
- * checked against the chosen style before anything is saved. Uploads are not
- * offered: no upload pipeline exists yet, so the source step says so instead of
- * pretending.
+ * checked against the chosen style before anything is saved. The photo step can
+ * pick from the Gallery or upload a new photo, which joins the Gallery only.
  */
 export function AddWidgetDialog() {
   const { dialog, widgets } = useWidgets();
@@ -54,6 +62,9 @@ export function AddWidgetDialog() {
  */
 function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
   const { closeDialog, addWidget, editWidget } = useWidgets();
+  const { showToast } = useToast();
+  // Widgets pick from the Gallery's own photos; there is no bundled list.
+  const { photos, reload: reloadGalleryPhotos } = useGalleryPhotos();
   const prefersReducedMotion = useReducedMotion();
   const titleId = useId();
 
@@ -67,9 +78,26 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
   const [size, setSize] = useState<WidgetSize>(editing?.config.size ?? "md");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<{
+    file: File;
+    previewUrl: string;
+  } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Guards against a second upload starting while one is still in flight.
+  const uploadingRef = useRef(false);
+  const submittingRef = useRef(false);
 
   const entry = kind ? getCatalogEntry(kind) : null;
   const isPhotoWidget = (entry?.maxPhotos ?? 0) > 0;
+
+  useEffect(() => {
+    return () => {
+      if (pendingUpload) {
+        URL.revokeObjectURL(pendingUpload.previewUrl);
+      }
+    };
+  }, [pendingUpload]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -121,8 +149,66 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
     setMessage(null);
   }
 
+  function chooseUploadFile(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    const fileError = widgetUploadFileError(file);
+
+    if (fileError) {
+      setMessage(fileError);
+      return;
+    }
+
+    setMessage(null);
+    setPendingUpload({ file, previewUrl: URL.createObjectURL(file) });
+  }
+
+  function cancelUpload() {
+    if (uploadingRef.current) {
+      return;
+    }
+
+    setPendingUpload(null);
+    setMessage(null);
+  }
+
+  async function confirmUpload() {
+    if (!pendingUpload || !entry || uploadingRef.current) {
+      return;
+    }
+
+    uploadingRef.current = true;
+    setBusy(true);
+    setMessage(null);
+    setUploadProgress(0);
+
+    try {
+      await uploadPhotoFile(pendingUpload.file, {
+        onProgress: setUploadProgress,
+      });
+
+      // The uploaded photo joins the Gallery list so the user can pick it there.
+      // It is not added to this widget; the user selects it separately.
+      reloadGalleryPhotos();
+      URL.revokeObjectURL(pendingUpload.previewUrl);
+      setPendingUpload(null);
+      setMessage(null);
+    } catch (error) {
+      // The file stays in the preview so the user can retry without choosing it again.
+      setMessage(
+        error instanceof Error ? error.message : "That photo could not be uploaded.",
+      );
+    } finally {
+      uploadingRef.current = false;
+      setBusy(false);
+      setUploadProgress(null);
+    }
+  }
+
   async function submit() {
-    if (!kind) {
+    if (!kind || submittingRef.current) {
       return;
     }
 
@@ -131,17 +217,26 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
       return;
     }
 
+    submittingRef.current = true;
     setBusy(true);
     setMessage(null);
 
-    const result = editing
-      ? await editWidget(editing.id, { photoIds, text, date, size })
-      : await addWidget({ kind, photoIds, text, date, size });
+    try {
+      const result = editing
+        ? await editWidget(editing.id, { photoIds, text, date, size })
+        : await addWidget({ kind, photoIds, text, date, size });
 
-    setBusy(false);
+      if (!result.ok) {
+        const message = result.error ?? "That could not be saved.";
+        setMessage(message);
+        showToast(message, "error");
+        return;
+      }
 
-    if (!result.ok) {
-      setMessage(result.error ?? "That could not be saved.");
+      showToast("Widget saved successfully.");
+    } finally {
+      submittingRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -240,7 +335,7 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                           : "border-paper-edge hover:border-primary/60 hover:bg-blush-pink/35"
                       }`}
                     >
-                      <WidgetStylePreview kind={candidate.kind} />
+                      <WidgetStylePreview kind={candidate.kind} photos={photos} />
                       <span className="mt-2 flex items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-paper-foreground">
                           {candidate.title}
@@ -263,13 +358,83 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                     <span className="rounded-full bg-blush-pink px-2.5 py-1 text-[11px] font-medium text-paper-foreground">
                       From the gallery
                     </span>
-                    <span
-                      title="Photo uploads are not built yet, so new files cannot be added here."
-                      className="rounded-full border border-dashed border-paper-edge px-2.5 py-1 text-[11px] text-paper-foreground/45"
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={busy}
+                      className="cursor-pointer rounded-full border border-dashed border-primary/60 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-blush-pink/50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Upload a new photo · soon
-                    </span>
+                      Upload a new photo
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      className="hidden"
+                      onChange={(event) => {
+                        chooseUploadFile(event.target.files?.[0]);
+                        // Allows choosing the same file again after a cancel.
+                        event.target.value = "";
+                      }}
+                    />
                   </div>
+
+                  {pendingUpload ? (
+                    <div className="mb-4 flex flex-col items-center gap-3 rounded-2xl bg-blush-pink/50 p-3 ring-1 ring-paper-edge sm:flex-row">
+                      <div className="relative aspect-square w-32 shrink-0 overflow-hidden rounded-lg ring-1 ring-paper-edge">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- local object URL preview */}
+                        <img
+                          src={pendingUpload.previewUrl}
+                          alt="Selected photo preview"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 space-y-2 text-center sm:text-left">
+                        <p className="text-xs text-paper-foreground/75">
+                          Upload this photo to the gallery? You can pick it for this widget afterwards.
+                        </p>
+                        {uploadProgress !== null ? (
+                          <div
+                            role="progressbar"
+                            aria-label="Upload progress"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={uploadProgress}
+                            className="h-1.5 w-full overflow-hidden rounded-full bg-paper-edge"
+                          >
+                            <div
+                              className="h-full bg-primary transition-[width]"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        ) : null}
+                        <div className="flex justify-center gap-2 sm:justify-start">
+                          <button
+                            type="button"
+                            onClick={cancelUpload}
+                            disabled={busy}
+                            className="cursor-pointer rounded-full border border-paper-edge px-3 py-1.5 text-xs font-medium text-paper-foreground transition-colors hover:bg-blush-pink/50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={confirmUpload}
+                            disabled={busy}
+                            className="cursor-pointer rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {busy
+                              ? uploadProgress === 100
+                                ? "Saving…"
+                                : "Uploading…"
+                              : message
+                                ? "Try again"
+                                : "Upload"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <p className="mb-3 text-xs text-paper-foreground/65">
                     {entry.title} shows{" "}
@@ -280,6 +445,20 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                   </p>
 
                   <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {Array.from({ length: PHOTO_PLACEHOLDER_COUNT }).map(
+                      (_, index) => (
+                        <li
+                          key={`empty-slot-${index}`}
+                          aria-hidden="true"
+                          title="An empty slot — upload a photo on the Gallery page to fill it"
+                        >
+                          <span className="block overflow-hidden rounded-lg ring-1 ring-paper-edge">
+                            <PhotoPlaceholder tone={index} />
+                          </span>
+                        </li>
+                      ),
+                    )}
+
                     {photos.map((photo) => {
                       const index = photoIds.indexOf(photo.id);
                       const selected = index !== -1;
@@ -290,7 +469,7 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                             type="button"
                             onClick={() => togglePhoto(photo.id)}
                             aria-pressed={selected}
-                            aria-label={`${photo.caption}${selected ? `, chosen number ${index + 1}` : ""}`}
+                            aria-label={`${photo.caption || "Photo"}${selected ? `, chosen number ${index + 1}` : ""}`}
                             className={`relative block w-full cursor-pointer overflow-hidden rounded-lg ring-2 transition-all ${
                               selected
                                 ? "ring-primary"
@@ -316,6 +495,20 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                       );
                     })}
                   </ul>
+
+                  {photos.length === 0 ? (
+                    <p className="mt-3 rounded-2xl border border-dashed border-paper-edge px-4 py-3 text-center text-[11px] text-paper-foreground/60">
+                      Your gallery is empty. Upload photos first and they will
+                      appear here —{" "}
+                      <Link
+                        href="/gallery"
+                        className="font-medium text-primary underline-offset-2 hover:underline"
+                      >
+                        open the Gallery
+                      </Link>
+                      .
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -333,7 +526,7 @@ function WidgetDialogBody({ editing }: { editing: WidgetRecord | null }) {
                         aspectRatio: `${SIZE_DIMENSIONS[size].width} / ${SIZE_DIMENSIONS[size].height}`,
                       }}
                     >
-                      <WidgetRenderer config={previewConfig} />
+                      <WidgetRenderer config={previewConfig} photos={photos} />
                     </div>
                   </div>
 

@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  images: {
+    // Uploaded gallery photos are delivered from Cloudinary; the bundled
+    // `public/couple-images` fallback stays local and needs no entry. The
+    // pathname is limited to this account's upload folder.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/jcfs5sek/image/upload/**",
+      },
+    ],
+  },
   turbopack: {
     rules: {
       "*.css": {

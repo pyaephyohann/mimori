@@ -7,16 +7,20 @@ import { randomizeForVisit } from "./photo-order";
 /**
  * Returns `photos` in a per-visit random order.
  *
- * The first render uses the order it was given, so server and client markup
- * match and there is no hydration mismatch; the stored order is applied after
- * mount. Re-renders — including a new array holding the same photos — keep the
- * current order and never call the randomiser again.
+ * Only the order is remembered. The items themselves are always taken from the
+ * array passed in, so a photo whose title was just saved — or one whose picture
+ * was replaced — shows its new content immediately, without the order having to
+ * change. A new or removed photo changes the id signature and is arranged into
+ * the order once, after mount: the first render uses the order it was given, so
+ * server and client markup match and there is no hydration mismatch.
  */
 export function useShuffledPhotos<T extends { id: string }>(
   photos: readonly T[],
   storageKey: string,
 ): readonly T[] {
-  const [ordered, setOrdered] = useState<readonly T[]>(photos);
+  const [order, setOrder] = useState<readonly string[]>(() =>
+    photos.map((photo) => photo.id),
+  );
   const appliedSignature = useRef<string | null>(null);
 
   const signature = photos.map((photo) => photo.id).join("|");
@@ -27,8 +31,15 @@ export function useShuffledPhotos<T extends { id: string }>(
     }
 
     appliedSignature.current = signature;
-    setOrdered(randomizeForVisit(photos, storageKey));
+    setOrder(
+      randomizeForVisit(photos, storageKey).map((photo) => photo.id),
+    );
   }, [photos, signature, storageKey]);
 
-  return ordered;
+  const byId = new Map(photos.map((photo) => [photo.id, photo]));
+
+  return order.flatMap((id) => {
+    const photo = byId.get(id);
+    return photo ? [photo] : [];
+  });
 }

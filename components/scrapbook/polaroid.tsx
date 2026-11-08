@@ -2,7 +2,7 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 
 import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
-import type { Photo } from "@/lib/photos";
+import type { Photo } from "@/lib/photo";
 
 type PolaroidProps = {
   photo: Photo;
@@ -16,6 +16,12 @@ type PolaroidProps = {
   heart?: boolean;
   /** Straightens and lifts the photo on hover. */
   interactive?: boolean;
+  /**
+   * Makes the whole frame a hit area for a viewer. The button is an empty
+   * overlay, so the frame keeps its figure/caption structure and no
+   * interactive element is nested inside another.
+   */
+  onOpen?: () => void;
   className?: string;
 };
 
@@ -33,6 +39,7 @@ export function Polaroid({
   bow = false,
   heart = false,
   interactive = false,
+  onOpen,
   className = "",
 }: PolaroidProps) {
   return (
@@ -65,6 +72,15 @@ export function Polaroid({
         <HeartDoodle
           filled
           className="absolute -top-3 -left-3 h-7 w-7 -rotate-12 text-warm-charcoal/85"
+        />
+      ) : null}
+
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={photo.caption ? `View “${photo.caption}”` : "View photo"}
+          className="absolute inset-0 z-10 cursor-pointer rounded-[var(--polaroid-radius)] outline-offset-4"
         />
       ) : null}
     </figure>

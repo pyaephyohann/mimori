@@ -31,29 +31,64 @@ enum PhotoKind {
 
 /// A folder that groups photos across the whole application.
 ///
+/// This table backs the Collections page: a collection *is* a folder, so the
+/// UI's "collections" and this model are the same thing rather than two
+/// parallel concepts.
+///
 /// Names are globally unique. With a single shared collection there is no
 /// tenant to scope a duplicate to, and two folders called "Trips" would be
 /// indistinguishable in navigation, so the database enforces one of each name.
 /// Rename a folder rather than allowing a duplicate.
 model Folder {
-  id          String   @id @default(cuid())
+  id           String   @id @default(cuid())
   /// Globally unique within Mimori.
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  name         String   @unique
+  description  String?
+  /// Pinned collections are listed first on the Collections page.
+  pinned       Boolean  @default(false)
+  /// Gallery `Photo` id used as the cover. Null falls back to the first photo
+  /// in the collection.
+  coverPhotoId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   photos Photo[]
+  /// Photos placed in this collection, in display order.
+  items  CollectionPhoto[]
+
+  @@index([pinned, createdAt])
+}
+
+/// Photos placed in a collection, in display order.
+///
+/// `photoId` is the id of a gallery `Photo` row — the app's single image source
+/// — and deliberately has no foreign key: adding a photo to a collection must
+/// never duplicate or own its record. Membership is validated against the
+/// `Photo` table and filtered on read, so a deleted photo simply leaves the
+/// collection. Removing a row here removes the photo from the collection only;
+/// the `Photo` row is untouched.
+model CollectionPhoto {
+  folderId String
+  photoId  String
+  /// Display order inside the collection; ties are broken by photoId.
+  position Int      @default(0)
+  addedAt  DateTime @default(now())
+
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@id([folderId, photoId])
+  @@index([folderId, position])
+  @@index([photoId])
 }
 
 /// Photo metadata. The image itself is stored in Cloudinary and referenced here.
 model Photo {
-  id       String    @id @default(cuid())
+  id        String    @id @default(cuid())
   /// Null means the photo is unfiled; it still belongs to the gallery.
-  folderId String?
-  kind     PhotoKind @default(GALLERY)
+  folderId  String?
+  kind      PhotoKind @default(GALLERY)
   /// Cloudinary public id, used to transform or delete the asset.
-  publicId String    @unique
+  publicId  String    @unique
   /// Cloudinary secure (https) delivery URL.
   secureUrl String
   caption   String?
@@ -70,12 +105,82 @@ model Photo {
   updatedAt DateTime  @updatedAt
 
   // Deleting a folder keeps its photos and moves them to "unfiled".
-  folder      Folder?       @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  folder      Folder?             @relation(fields: [folderId], references: [id], onDelete: SetNull)
   widgetItems WidgetPhoto[]
+  /// The saved booth sessions this photo's shot belongs to (at most one).
+  boothShots  PhotoboothShot[]    @relation("BoothShotPhoto")
+  /// The saved booth sessions this photo is the finished print of.
+  boothPrints PhotoboothSession[] @relation("BoothSessionPrint")
 
   @@index([kind, createdAt])
   @@index([folderId, createdAt])
   @@index([createdAt])
+}
+
+/// A saved Photo Booth session.
+///
+/// The print is an ordinary `GALLERY` photo, so saving a booth is the same act
+/// as adding a photo to the gallery: the Gallery page, its pickers and its
+/// collections all find it through the existing `kind` filter, with no second
+/// gallery implementation. The captures it was made from stay `PHOTO_BOOTH`
+/// photos, which that same filter keeps out of the gallery.
+///
+/// The editor settings are stored as columns (not one opaque blob) so a session
+/// can be reopened and validated field by field; stickers, the only list, are
+/// validated JSON.
+model PhotoboothSession {
+  id            String   @id @default(cuid())
+  /// Number of photos in the print: 2, 3, 4 or 6.
+  photoCount    Int
+  /// `strip` or `collage`, as defined in `lib/photo-booth/catalog.ts`.
+  layout        String
+  /// Border template key from `lib/photo-booth/borders.ts`.
+  borderKey     String
+  /// Paper swatch key; null keeps the border template's own paper.
+  backgroundKey String?
+  caption       String?
+  /// Whether the session's date is printed on the paper.
+  showDate      Boolean  @default(true)
+  /// The date printed on the print (`yyyy-mm-dd`) — not when this row was
+  /// written. The database timestamps below are the session's own history.
+  printDate     String?
+  /// Gap between photos, in composition units.
+  spacing       Int
+  /// Frame thickness, in composition units.
+  borderWidth   Int
+  /// Validated `StickerPlacement[]` from the editor.
+  stickers      Json?
+  /// The finished print. Deleting the photo removes the session that described
+  /// it, because the session cannot be reopened without its print.
+  printPhotoId  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  printPhoto Photo            @relation("BoothSessionPrint", fields: [printPhotoId], references: [id], onDelete: Cascade)
+  shots      PhotoboothShot[]
+
+  @@index([createdAt])
+  @@index([printPhotoId])
+}
+
+/// One captured photograph inside a saved session, in capture order.
+///
+/// A capture belongs to exactly one session, which the unique `photoId`
+/// enforces, and a session cannot have two shots at the same position.
+model PhotoboothShot {
+  id        String   @id @default(cuid())
+  sessionId String
+  /// A `PHOTO_BOOTH` photo: the original frame, kept out of the Gallery.
+  photoId   String
+  /// Capture order inside the print, starting at 0.
+  position  Int
+  createdAt DateTime @default(now())
+
+  session PhotoboothSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  photo   Photo             @relation("BoothShotPhoto", fields: [photoId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, position])
+  @@unique([photoId])
 }
 
 /// A widget that displays a chosen set of photos.
@@ -94,7 +199,6 @@ model Widget {
 
   @@index([type])
 }
-
 /// Photos selected for a widget, in display order.
 /// A photo can appear in many widgets; a widget cannot contain the same photo twice.
 model WidgetPhoto {

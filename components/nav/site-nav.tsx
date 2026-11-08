@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useId, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ComponentType } from "react";
 
 import {
@@ -11,11 +10,13 @@ import {
   FolderIcon,
   GalleryIcon,
   HomeIcon,
-  MenuIcon,
   PlusIcon,
 } from "@/components/nav/nav-icons";
-import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
+import { useCollections } from "@/components/collections/collections-provider";
+import { useGalleryUpload } from "@/components/gallery/gallery-upload-context";
+import { HeartDoodle } from "@/components/scrapbook/doodles";
 import { useWidgets } from "@/components/widgets/widgets-provider";
+import Image from "next/image";
 
 type Icon = ComponentType<{ className?: string }>;
 
@@ -27,55 +28,40 @@ type Destination = {
 };
 
 /**
- * The navbar's five destinations. Only `/` and the homepage's gallery section
- * exist today; Folders, Photo Booth and Widgets have no route or UI, so they
- * render as clearly unavailable entries instead of dead links or invented
- * pages.
+ * The navbar's four destinations. All four have a route: `/`, `/gallery`,
+ * `/collections` and `/photo-booth` (whose setup screen is live; capture comes
+ * in a later phase).
  */
 const DESTINATIONS: readonly Destination[] = [
   { label: "Home", href: "/", icon: HomeIcon },
-  { label: "Gallery", href: "/#gallery", icon: GalleryIcon },
-  { label: "Collections", icon: FolderIcon },
-  { label: "Photo Booth", icon: CameraIcon },
+  { label: "Gallery", href: "/gallery", icon: GalleryIcon },
+  { label: "Collections", href: "/collections", icon: FolderIcon },
+  { label: "Photo Booth", href: "/photo-booth", icon: CameraIcon },
 ];
 
+/** A destination stays active on its own sub-pages, such as one collection. */
+function isActive(pathname: string, href?: string): boolean {
+  if (!href) {
+    return false;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 const UNAVAILABLE_HINT = "Coming soon — no page exists yet";
-const ADD_MEMORY_HINT =
-  "Photo uploads aren't built yet, so there is nothing to add to";
-const ADD_COLLECTION_HINT =
-  "Collection creation isn't built yet, so there is nothing to add";
-const NEW_PHOTO_BOOTH_HINT =
-  "Photo Booth creation isn't built yet, so there is nothing to add";
+const ADD_MEMORY_HINT = "Open the Gallery to add a memory";
 
 export function SiteNav() {
   const pathname = usePathname();
   const prefersReducedMotion = useReducedMotion();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuId = useId();
 
   const pillTransition = prefersReducedMotion
     ? { duration: 0 }
     : { type: "spring" as const, stiffness: 380, damping: 32 };
 
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setMenuOpen(false);
-      }
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [menuOpen]);
-
   return (
     <>
-      <header className="sticky top-0 z-50 bg-background/85 px-3 pt-3 backdrop-blur-sm sm:px-4 sm:pt-4">
+      <header className="sticky top-0 z-50 bg-background/85 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-sm sm:px-4 sm:pt-4">
         <div className="relative mx-auto w-full max-w-6xl">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-2xl border border-paper-edge bg-paper px-3 py-2 shadow-[0_12px_30px_-22px_rgba(73,52,61,0.75)] sm:gap-4 lg:rounded-[22px] lg:px-5 lg:py-2.5">
             <Link
@@ -83,7 +69,7 @@ export function SiteNav() {
               className="flex shrink-0 cursor-pointer items-center gap-2 rounded-full outline-offset-4"
               aria-label="Mimori — home"
             >
-              <BowSticker className="h-9 w-9 sm:h-10 sm:w-10 select-none" />
+              <Image alt="Mimori" src="/logo.svg" width={40} height={40} />
               <span className="font-decorative text-2xl leading-none text-warm-charcoal sm:text-[1.7rem]">
                 Mimori
               </span>
@@ -98,7 +84,7 @@ export function SiteNav() {
                   <li key={destination.label}>
                     <DesktopDestination
                       destination={destination}
-                      active={pathname === destination.href}
+                      active={isActive(pathname, destination.href)}
                       transition={pillTransition}
                     />
                   </li>
@@ -106,60 +92,25 @@ export function SiteNav() {
               </ul>
             </nav>
 
-            <div className="flex items-center justify-end gap-2">
-              <AddMemoryButton className="hidden lg:inline-flex" />
-
-              <button
-                type="button"
-                onClick={() => setMenuOpen((open) => !open)}
-                aria-expanded={menuOpen}
-                aria-controls={menuId}
-                aria-label={menuOpen ? "Close menu" : "Open menu"}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-paper-edge text-warm-charcoal transition-colors hover:bg-blush-pink/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
-              >
-                <MenuIcon className="h-5 w-5" />
-              </button>
+            {/* The page's own creation action, on every size: the bottom bar
+                carries navigation, so the header carries the one action. */}
+            <div className="flex items-center justify-end">
+              <PrimaryActionButton compact />
             </div>
           </div>
-
-          <AnimatePresence>
-            {menuOpen ? (
-              <motion.div
-                id={menuId}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={
-                  prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }
-                }
-                transition={{
-                  duration: prefersReducedMotion ? 0 : 0.18,
-                  ease: "easeOut",
-                }}
-                className="absolute inset-x-0 mt-2 origin-top rounded-2xl border border-paper-edge bg-paper p-3 shadow-[0_18px_40px_-24px_rgba(73,52,61,0.8)] lg:hidden"
-              >
-                <AddMemoryButton className="w-full justify-center" />
-                <p className="mt-2 px-1 text-center text-xs text-warm-charcoal/60">
-                  {pathname === "/"
-                    ? "Pick a scrapbook piece for your little desktop."
-                    : "Saving new memories arrives with photo uploads."}
-                </p>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
         </div>
       </header>
 
       <nav
         aria-label="Main"
-        onClick={() => setMenuOpen(false)}
         className="fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
       >
-        <ul className="mx-auto grid max-w-md grid-cols-5 gap-0.5 rounded-2xl border border-paper-edge bg-paper px-1.5 py-1.5 shadow-[0_-10px_30px_-22px_rgba(73,52,61,0.9)]">
+        <ul className="mx-auto grid max-w-md grid-cols-4 gap-0.5 rounded-2xl border border-paper-edge bg-paper px-1.5 py-1.5 shadow-[0_-10px_30px_-22px_rgba(73,52,61,0.9)]">
           {DESTINATIONS.map((destination) => (
             <li key={destination.label}>
               <MobileDestination
                 destination={destination}
-                active={pathname === destination.href}
+                active={isActive(pathname, destination.href)}
                 transition={pillTransition}
               />
             </li>
@@ -284,46 +235,96 @@ function MobileDestination({
   );
 }
 
-function AddMemoryButton({ className = "" }: { className?: string }) {
+/**
+ * The header's single action. `compact` tightens it below `sm`, where the
+ * header shares the row with the wordmark and the longest label
+ * ("New Photo Booth") would otherwise wrap onto a second line.
+ */
+function PrimaryActionButton({
+  className = "",
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
   const pathname = usePathname();
   const { openAdd } = useWidgets();
+  const { openCreate } = useCollections();
 
-  // The homepage is the only destination with a creation flow: adding widgets
-  // to the scrapbook desktop. Every other page still has nothing behind it.
+  const { openUpload } = useGalleryUpload();
+
+  const buttonClass = `inline-flex items-center rounded-full bg-primary font-semibold whitespace-nowrap text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover ${
+    compact
+      ? "gap-1 px-3 py-2 text-[13px] sm:gap-1.5 sm:px-4 sm:text-sm"
+      : "gap-1.5 px-4 py-2 text-sm"
+  } ${className}`;
+
+  // Each destination that has a creation flow opens it directly.
   if (pathname === "/") {
     return (
       <button
         type="button"
         onClick={openAdd}
-        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover ${className}`}
+        className={`cursor-pointer ${buttonClass}`}
       >
-        <PlusIcon className="h-4 w-4" />
+        <PlusIcon className="h-4 w-4 shrink-0" />
         Add Widgets
       </button>
     );
   }
 
-  const buttonMap: Record<string, { label: string; hint: string }> = {
-    "/#gallery": { label: "+ Add Memory", hint: ADD_MEMORY_HINT },
-    // Collections and Photo Booth have no built routes/UIs yet
-    "/collections": { label: "+ Add Collection", hint: ADD_COLLECTION_HINT },
-    "/photo-booth": { label: "+ New Photo Booth", hint: NEW_PHOTO_BOOTH_HINT },
-  };
+  if (isActive(pathname, "/collections")) {
+    return (
+      <button
+        type="button"
+        onClick={openCreate}
+        className={`cursor-pointer ${buttonClass}`}
+      >
+        <PlusIcon className="h-4 w-4 shrink-0" />
+        Add Collection
+      </button>
+    );
+  }
 
-  const buttonInfo = buttonMap[pathname] ?? {
-    label: "+ Add Memory",
-    hint: ADD_MEMORY_HINT,
-  };
+  // The Gallery's action opens the same upload dialog as the page's button.
+  if (isActive(pathname, "/gallery")) {
+    return (
+      <button
+        type="button"
+        onClick={openUpload}
+        className={`cursor-pointer ${buttonClass}`}
+      >
+        <PlusIcon className="h-4 w-4 shrink-0" />
+        Add Memory
+      </button>
+    );
+  }
 
+  // Photo Booth opens its setup screen; the anchor starts a fresh booth by
+  // returning to the top of that flow.
+  if (isActive(pathname, "/photo-booth")) {
+    return (
+      <Link
+        href="/photo-booth#photo-booth-setup"
+        className={`cursor-pointer ${buttonClass}`}
+      >
+        <PlusIcon className="h-4 w-4" />
+        New Photo Booth
+      </Link>
+    );
+  }
+
+  // Anywhere else there is no creation flow, so the action stays visibly
+  // unavailable rather than pretending to add anything.
   return (
     <button
       type="button"
       disabled
-      title={buttonInfo.hint}
-      className={`inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-shadow disabled:cursor-not-allowed disabled:opacity-95 ${className}`}
+      title={ADD_MEMORY_HINT}
+      className={`${buttonClass} transition-shadow disabled:cursor-not-allowed disabled:opacity-95`}
     >
-      <PlusIcon className="h-4 w-4" />
-      {buttonInfo.label}
+      <PlusIcon className="h-4 w-4 shrink-0" />
+      Add Memory
     </button>
   );
 }
