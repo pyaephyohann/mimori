@@ -101,16 +101,17 @@ export function SiteNav() {
         </div>
       </header>
 
-      {/* The bottom bar is fixed above the page and keeps its distance from a
-          home indicator through the safe-area inset. The container is only a
-          positioning frame: it is pointer-transparent so the strip around the
-          floating panel (and the corners beside it) still taps the page
-          underneath, exactly like a native tab bar's empty edges. */}
+      {/* The bottom bar is docked to the bottom edge: it is the paper surface
+          itself, anchored at `bottom-0`, so nothing shows beneath it. The
+          home-indicator inset is padding inside that surface rather than a gap
+          under it, which keeps the destinations clear of the indicator while
+          the bar's background still reaches the edge of the screen — in a
+          browser and in the installed standalone PWA alike. */}
       <nav
         aria-label="Main"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-paper-edge bg-paper px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-22px_rgba(73,52,61,0.9)] lg:hidden"
       >
-        <ul className="pointer-events-auto mx-auto grid max-w-md grid-cols-4 gap-0.5 rounded-2xl border border-paper-edge bg-paper px-1.5 py-1.5 shadow-[0_-10px_30px_-22px_rgba(73,52,61,0.9)]">
+        <ul className="mx-auto grid max-w-md grid-cols-4 gap-0.5">
           {DESTINATIONS.map((destination) => (
             <li key={destination.label}>
               <MobileDestination

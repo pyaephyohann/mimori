@@ -678,8 +678,10 @@ export function PhotoBook({
           </p>
 
           {/* Equal padding either side holds both arrows the same distance in
-              from the book's edges, so they read as a pair at every width. */}
-          <div className="mt-3 flex items-center justify-between gap-3 px-4 sm:px-6">
+              from the book's edges, so they read as a pair at every width. A
+              shallower top margin lifts the pair a little closer to the folio
+              without moving either button sideways or changing its size. */}
+          <div className="mt-1.5 flex items-center justify-between gap-3 px-4 sm:px-6">
             <button
               type="button"
               onClick={() => turn(-1)}

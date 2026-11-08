@@ -80,16 +80,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                     <ZoomGuard />
                     <SiteNav />
                     <InstallPrompt />
-                    {/* The mobile bottom bar is fixed, so the content column
-                        reserves room for it instead of hiding the end of the
-                        page behind it: the bar's own height (inside the pill
-                        and its gap from the edge) plus the home-indicator inset
-                        the bar is lifted by, so a phone with a home indicator
-                        gets the same clearance as one without. This column is
-                        also where a navigation settles in: it is the one node
-                        that survives every route change, so the page can glide
-                        in without being remounted. */}
-                    <PageTransition className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
+                    {/* The mobile bottom bar is fixed to the edge, so the
+                        content column reserves room for it instead of hiding
+                        the end of the page behind it: the bar's own height
+                        plus the home-indicator inset it pads with, so a phone
+                        with an indicator gets the same clearance as one
+                        without. This column is also where a navigation settles
+                        in: it is the one node that survives every route
+                        change, so the page can glide in without being
+                        remounted. */}
+                    <PageTransition className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-0">
                       {children}
                     </PageTransition>
                     <AddWidgetDialog />
