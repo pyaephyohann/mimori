@@ -13,6 +13,7 @@ import { AddWidgetDialog } from "@/components/widgets/add-widget-dialog";
 import { WidgetsProvider } from "@/components/widgets/widgets-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
+import { ZoomGuard } from "@/components/pwa/zoom-guard";
 
 import "./globals.css";
 
@@ -42,6 +43,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // A fixed-scale app: no pinch and no double-tap zoom. Browsers that ignore
+  // `userScalable` are covered by the page's `touch-action` and, on iOS, by
+  // the pinch guard mounted below.
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   themeColor: "#FF4FA3",
 };
@@ -71,15 +77,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <CollectionsProvider>
                   <WidgetsProvider>
                     <ServiceWorkerRegister />
+                    <ZoomGuard />
                     <SiteNav />
                     <InstallPrompt />
                     {/* The mobile bottom bar is fixed, so the content column
                         reserves room for it instead of hiding the end of the
-                        page behind it. This column is also where a navigation
-                        settles in: it is the one node that survives every
-                        route change, so the page can glide in without being
-                        remounted. */}
-                    <PageTransition className="flex-1 pb-24 lg:pb-0">
+                        page behind it: the bar's own height (inside the pill
+                        and its gap from the edge) plus the home-indicator inset
+                        the bar is lifted by, so a phone with a home indicator
+                        gets the same clearance as one without. This column is
+                        also where a navigation settles in: it is the one node
+                        that survives every route change, so the page can glide
+                        in without being remounted. */}
+                    <PageTransition className="flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
                       {children}
                     </PageTransition>
                     <AddWidgetDialog />

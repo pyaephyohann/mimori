@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 
 import { ModalShell } from "@/components/collections/modal-shell";
@@ -296,223 +297,223 @@ export function GalleryUploadDialog({ open, onClose }: GalleryUploadDialogProps)
   const added = items.filter((item) => item.status === "added");
   const failed = items.filter((item) => item.status === "error");
 
-  if (!open) {
-    return null;
-  }
-
   return (
-    <ModalShell
-      title="Upload photos"
-      description="Your photos will appear in your gallery."
-      onClose={onClose}
-      wide
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p
-            role="status"
-            aria-live="polite"
-            className={`min-h-4 text-xs ${
-              notice ? "text-deep-candy-pink" : "text-paper-foreground/60"
-            }`}
-          >
-            {notice ??
-              (failed.length > 0 && !uploading
-                ? "Some photos were not added."
-                : "")}
-          </p>
+    <AnimatePresence>
+      {open ? (
+        <ModalShell
+          title="Upload photos"
+          description="Your photos will appear in your gallery."
+          onClose={onClose}
+          wide
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p
+                role="status"
+                aria-live="polite"
+                className={`min-h-4 text-xs ${
+                  notice ? "text-deep-candy-pink" : "text-paper-foreground/60"
+                }`}
+              >
+                {notice ??
+                  (failed.length > 0 && !uploading
+                    ? "Some photos were not added."
+                    : "")}
+              </p>
 
-          <div className="flex items-center gap-2">
-            {added.length > 0 && pending.length > 0 && !uploading ? (
+              <div className="flex items-center gap-2">
+                {added.length > 0 && pending.length > 0 && !uploading ? (
+                  <button
+                    type="button"
+                    onClick={clearFinished}
+                    className="cursor-pointer rounded-full border border-paper-edge px-3 py-1.5 text-xs font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
+                  >
+                    Clear added
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    // With nothing left to upload, this is the way out of the
+                    // dialog; the next open starts from an empty queue.
+                    if (pending.length === 0 && added.length > 0) {
+                      resetQueue();
+                      onClose();
+                      return;
+                    }
+
+                    void uploadAll();
+                  }}
+                  disabled={uploading || (pending.length === 0 && added.length === 0)}
+                  className="cursor-pointer rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  {uploading
+                    ? "Uploading…"
+                    : pending.length > 0
+                      ? `Upload ${pending.length} photo${pending.length === 1 ? "" : "s"}`
+                      : "Done"}
+                </button>
+              </div>
+            </div>
+          }
+        >
+          {items.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-paper-edge bg-blush-pink/25 px-4 py-10 text-center">
+              <p className="font-decorative text-xl text-paper-foreground">
+                Pick a few memories
+              </p>
+              <p className="mt-1 text-xs text-paper-foreground/65">
+                {UPLOAD_FORMAT_LABEL} · up to {MAX_UPLOAD_FILES} at a time ·{" "}
+                {MAX_MEGABYTES} MB each
+              </p>
               <button
                 type="button"
-                onClick={clearFinished}
-                className="cursor-pointer rounded-full border border-paper-edge px-3 py-1.5 text-xs font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
+                onClick={() => inputRef.current?.click()}
+                className="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
               >
-                Clear added
+                <PlusIcon className="h-4 w-4" />
+                Choose photos
               </button>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => {
-                // With nothing left to upload, this is the way out of the
-                // dialog; the next open starts from an empty queue.
-                if (pending.length === 0 && added.length > 0) {
-                  resetQueue();
-                  onClose();
-                  return;
-                }
-
-                void uploadAll();
-              }}
-              disabled={uploading || (pending.length === 0 && added.length === 0)}
-              className="cursor-pointer rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              {uploading
-                ? "Uploading…"
-                : pending.length > 0
-                  ? `Upload ${pending.length} photo${pending.length === 1 ? "" : "s"}`
-                  : "Done"}
-            </button>
-          </div>
-        </div>
-      }
-    >
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-paper-edge bg-blush-pink/25 px-4 py-10 text-center">
-          <p className="font-decorative text-xl text-paper-foreground">
-            Pick a few memories
-          </p>
-          <p className="mt-1 text-xs text-paper-foreground/65">
-            {UPLOAD_FORMAT_LABEL} · up to {MAX_UPLOAD_FILES} at a time ·{" "}
-            {MAX_MEGABYTES} MB each
-          </p>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="mt-4 inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Choose photos
-          </button>
-        </div>
-      ) : (
-        <>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {items.map((item) => (
-              <li
-                key={item.key}
-                className="overflow-hidden rounded-2xl border border-paper-edge bg-paper"
-              >
-                <div className="relative">
-                  <div
-                    role="img"
-                    aria-label={item.file.name}
-                    className="block aspect-square bg-paper-edge bg-cover bg-center"
-                    style={{ backgroundImage: `url("${item.previewUrl}")` }}
-                  />
-
-                  {item.status === "uploading" ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/80">
-                      <p className="text-sm font-semibold text-paper-foreground">
-                        {item.progress}%
-                      </p>
+            </div>
+          ) : (
+            <>
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {items.map((item) => (
+                  <li
+                    key={item.key}
+                    className="overflow-hidden rounded-2xl border border-paper-edge bg-paper"
+                  >
+                    <div className="relative">
                       <div
-                        role="progressbar"
-                        aria-label={`Uploading ${item.file.name}`}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={item.progress}
-                        className="h-1.5 w-3/4 overflow-hidden rounded-full bg-paper-edge"
-                      >
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width] duration-200"
-                          style={{ width: `${item.progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {item.status === "added" ? (
-                    <span className="absolute top-1.5 left-1.5 rounded-full bg-success-surface px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success-border">
-                      {item.duplicate ? "Already added" : "Added"}
-                    </span>
-                  ) : null}
-
-                  {item.status !== "uploading" ? (
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.key)}
-                      aria-label={`Remove ${item.file.name}`}
-                      className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-paper/90 text-paper-foreground shadow-sm transition-colors hover:bg-blush-pink/80"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true">
-                        <path
-                          d="m6 6 12 12M18 6 6 18"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                    </button>
-                  ) : null}
-                </div>
-
-                <div className="px-2 py-1.5">
-                  <p className="truncate text-[11px] text-paper-foreground/70">
-                    {item.file.name}
-                  </p>
-                  {item.status === "ready" ||
-                  (item.status === "error" && item.retryable) ? (
-                    <label className="mt-1 block">
-                      <span className="sr-only">Title for {item.file.name}</span>
-                      <input
-                        type="text"
-                        value={item.title}
-                        maxLength={MAX_PHOTO_TITLE_LENGTH}
-                        onChange={(event) =>
-                          setItemTitle(item.key, event.target.value)
-                        }
-                        placeholder="Add a title (optional)"
-                        className="w-full rounded-lg border border-paper-edge bg-paper px-2 py-1 font-decorative text-sm text-paper-foreground placeholder:font-sans placeholder:text-[11px] placeholder:text-paper-foreground/45 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        role="img"
+                        aria-label={item.file.name}
+                        className="block aspect-square bg-paper-edge bg-cover bg-center"
+                        style={{ backgroundImage: `url("${item.previewUrl}")` }}
                       />
-                    </label>
-                  ) : item.title ? (
-                    <p className="mt-0.5 truncate font-decorative text-sm text-paper-foreground">
-                      {item.title}
-                    </p>
-                  ) : null}
-                  {item.message ? (
-                    <p
-                      role={item.status === "error" ? "alert" : undefined}
-                      className={`mt-0.5 text-[10px] leading-tight ${
-                        item.status === "error"
-                          ? "text-danger"
-                          : "text-success"
-                      }`}
-                    >
-                      {item.message}
-                    </p>
-                  ) : null}
-                  {item.status === "error" && item.retryable ? (
-                    <button
-                      type="button"
-                      onClick={() => retryItem(item.key)}
-                      className="mt-1 cursor-pointer rounded-full border border-paper-edge px-2 py-0.5 text-[10px] font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
-                    >
-                      Try again
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={uploading || items.length >= MAX_UPLOAD_FILES}
-              className="cursor-pointer rounded-full border border-paper-edge px-3.5 py-1.5 text-xs font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60 disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              Add more photos
-            </button>
+                      {item.status === "uploading" ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-paper/80">
+                          <p className="text-sm font-semibold text-paper-foreground">
+                            {item.progress}%
+                          </p>
+                          <div
+                            role="progressbar"
+                            aria-label={`Uploading ${item.file.name}`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={item.progress}
+                            className="h-1.5 w-3/4 overflow-hidden rounded-full bg-paper-edge"
+                          >
+                            <div
+                              className="h-full rounded-full bg-primary transition-[width] duration-200"
+                              style={{ width: `${item.progress}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
 
-            <p className="text-[11px] text-paper-foreground/55">
-              {UPLOAD_FORMAT_LABEL} · {MAX_MEGABYTES} MB each
-            </p>
-          </div>
-        </>
-      )}
+                      {item.status === "added" ? (
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-success-surface px-2 py-0.5 text-[10px] font-semibold text-success ring-1 ring-success-border">
+                          {item.duplicate ? "Already added" : "Added"}
+                        </span>
+                      ) : null}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPT}
-        multiple
-        className="hidden"
-        onChange={(event) => addFiles(event.target.files)}
-      />
-    </ModalShell>
+                      {item.status !== "uploading" ? (
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.key)}
+                          aria-label={`Remove ${item.file.name}`}
+                          className="absolute top-1 right-1 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-paper/90 text-paper-foreground shadow-sm transition-colors hover:bg-blush-pink/80"
+                        >
+                          <svg viewBox="0 0 24 24" className="h-3 w-3" aria-hidden="true">
+                            <path
+                              d="m6 6 12 12M18 6 6 18"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="px-2 py-1.5">
+                      <p className="truncate text-[11px] text-paper-foreground/70">
+                        {item.file.name}
+                      </p>
+                      {item.status === "ready" ||
+                      (item.status === "error" && item.retryable) ? (
+                        <label className="mt-1 block">
+                          <span className="sr-only">Title for {item.file.name}</span>
+                          <input
+                            type="text"
+                            value={item.title}
+                            maxLength={MAX_PHOTO_TITLE_LENGTH}
+                            onChange={(event) =>
+                              setItemTitle(item.key, event.target.value)
+                            }
+                            placeholder="Add a title (optional)"
+                            className="w-full rounded-lg border border-paper-edge bg-paper px-2 py-1 font-decorative text-sm text-paper-foreground placeholder:font-sans placeholder:text-[11px] placeholder:text-paper-foreground/45 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          />
+                        </label>
+                      ) : item.title ? (
+                        <p className="mt-0.5 truncate font-decorative text-sm text-paper-foreground">
+                          {item.title}
+                        </p>
+                      ) : null}
+                      {item.message ? (
+                        <p
+                          role={item.status === "error" ? "alert" : undefined}
+                          className={`mt-0.5 text-[10px] leading-tight ${
+                            item.status === "error"
+                              ? "text-danger"
+                              : "text-success"
+                          }`}
+                        >
+                          {item.message}
+                        </p>
+                      ) : null}
+                      {item.status === "error" && item.retryable ? (
+                        <button
+                          type="button"
+                          onClick={() => retryItem(item.key)}
+                          className="mt-1 cursor-pointer rounded-full border border-paper-edge px-2 py-0.5 text-[10px] font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
+                        >
+                          Try again
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={uploading || items.length >= MAX_UPLOAD_FILES}
+                  className="cursor-pointer rounded-full border border-paper-edge px-3.5 py-1.5 text-xs font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  Add more photos
+                </button>
+
+                <p className="text-[11px] text-paper-foreground/55">
+                  {UPLOAD_FORMAT_LABEL} · {MAX_MEGABYTES} MB each
+                </p>
+              </div>
+            </>
+          )}
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ACCEPT}
+            multiple
+            className="hidden"
+            onChange={(event) => addFiles(event.target.files)}
+          />
+        </ModalShell>
+      ) : null}
+    </AnimatePresence>
   );
 }

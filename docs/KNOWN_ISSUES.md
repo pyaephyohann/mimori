@@ -377,6 +377,20 @@ Any issue documented below must have been actually observed. Do not speculate.
 - Notes / workaround: install through the browser menu on desktop or the Share menu on iOS. Offline use shows the offline page only; uploads and data need a connection. The service worker updates on the next visit.
 - Related: [D-054](DECISIONS.md)
 
+## ISSUE-030 — Pinch and double-tap zoom are locked by design, and the iOS half is unverified on a device
+
+- Area: pwa
+- Status: accepted limitation
+- Severity: low
+- Environment: `next dev` at 4310 in a Chromium browser with a 390×844 mobile viewport; no physical iOS or Android device was available.
+- Steps to reproduce:
+  1. Open any Mimori page on a phone.
+  2. Pinch with two fingers, or double-tap the page.
+- Expected: the scale does not change; scrolling, swipes and drags behave as before.
+- Actual: in Chromium the viewport meta carries `maximum-scale=1, user-scalable=no`, `html` computes `touch-action: pan-x pan-y`, a dispatched `gesturestart` is cancelled and the widget drag surfaces still report `touch-action: none`; vertical scrolling and a horizontal snap track both still move. On iOS the same meta and CSS are served and the `gesture*` guard is wired, but Safari's behaviour was not observed on a device.
+- Notes / workaround: this is deliberate ([D-056](DECISIONS.md)) so the PWA keeps a fixed scale. It also removes the WCAG 1.4.4 pinch-to-200% affordance; the browser's text-size setting and the OS magnifier still work. If a future request wants zoom back, remove `maximumScale`/`userScalable`, the `html` rule and the guard together.
+- Related: [D-056](DECISIONS.md)
+
 ## Process
 
 - Log an issue when it is found, with reproduction steps.

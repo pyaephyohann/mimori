@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -409,18 +409,20 @@ export function PhotoBooth({
             </div>
           </section>
 
-          {setupOpen ? (
-            <SetupDialog
-              photoCount={photoCount}
-              layout={layout}
-              borderKey={borderKey}
-              onPhotoCountChange={setPhotoCount}
-              onLayoutChange={setLayout}
-              onBorderChange={setBorderKey}
-              onStart={startSession}
-              onClose={closeSetup}
-            />
-          ) : null}
+          <AnimatePresence>
+            {setupOpen ? (
+              <SetupDialog
+                photoCount={photoCount}
+                layout={layout}
+                borderKey={borderKey}
+                onPhotoCountChange={setPhotoCount}
+                onLayoutChange={setLayout}
+                onBorderChange={setBorderKey}
+                onStart={startSession}
+                onClose={closeSetup}
+              />
+            ) : null}
+          </AnimatePresence>
         </>
       ) : null}
 

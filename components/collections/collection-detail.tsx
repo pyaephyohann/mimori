@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -490,97 +491,101 @@ export function CollectionDetail({ collectionId }: { collectionId: string }) {
         </div>
       ) : null}
 
-      {addOpen ? (
-        <ModalShell
-          title="Add photos"
-          description="Choose from the gallery. Nothing is uploaded or duplicated."
-          onClose={() => setAddOpen(false)}
-          wide
-          footer={
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-paper-foreground/60">
-                {addSelection.length} selected
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(false)}
-                  className="cursor-pointer rounded-full border border-paper-edge px-4 py-2 text-sm font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || addSelection.length === 0}
-                  onClick={async () => {
-                    const added = await run(() =>
-                      updateCollection(collection.id, {
-                        addPhotoIds: addSelection,
-                      }),
-                    );
+      <AnimatePresence>
+        {addOpen ? (
+          <ModalShell
+            title="Add photos"
+            description="Choose from the gallery. Nothing is uploaded or duplicated."
+            onClose={() => setAddOpen(false)}
+            wide
+            footer={
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-paper-foreground/60">
+                  {addSelection.length} selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(false)}
+                    className="cursor-pointer rounded-full border border-paper-edge px-4 py-2 text-sm font-medium text-paper-foreground transition-colors hover:bg-blush-pink/60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || addSelection.length === 0}
+                    onClick={async () => {
+                      const added = await run(() =>
+                        updateCollection(collection.id, {
+                          addPhotoIds: addSelection,
+                        }),
+                      );
 
-                    if (added) {
-                      setAddOpen(false);
-                      setAddSelection([]);
-                    }
-                  }}
-                  className="cursor-pointer rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  Add to collection
-                </button>
+                      if (added) {
+                        setAddOpen(false);
+                        setAddSelection([]);
+                      }
+                    }}
+                    className="cursor-pointer rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    Add to collection
+                  </button>
+                </div>
               </div>
-            </div>
-          }
-        >
-          {addablePhotos.length === 0 && photos.length > 0 ? (
-            <p className="rounded-2xl border border-dashed border-paper-edge px-4 py-8 text-center text-sm text-paper-foreground/60">
-              Every gallery photo is already in this collection.
-            </p>
-          ) : (
-            <PhotoChoiceGrid
-              photos={addablePhotos}
-              selectedIds={addSelection}
-              onToggle={(photoId) =>
-                setAddSelection((current) =>
-                  current.includes(photoId)
-                    ? current.filter((id) => id !== photoId)
-                    : [...current, photoId],
-                )
-              }
-              disabled={busy}
-            />
-          )}
-        </ModalShell>
-      ) : null}
-
-      {deleteOpen ? (
-        <ConfirmDialog
-          title="Delete this collection?"
-          body={`“${collection.name}” will be removed. The ${count} photo${count === 1 ? "" : "s"} stay in the gallery and in every other collection.`}
-          confirmLabel="Delete collection"
-          onCancel={() => setDeleteOpen(false)}
-          onConfirm={async () => {
-            const result = await removeCollection(collection.id);
-
-            // A failure keeps the dialog open, where the error is shown. A
-            // deleted collection has no page left, so this one leaves for the
-            // list; the toast is app-wide, so it outlives this page.
-            if (!result.ok) {
-              showToast(
-                result.error ?? "That collection could not be deleted.",
-                "error",
-              );
-              return result;
             }
+          >
+            {addablePhotos.length === 0 && photos.length > 0 ? (
+              <p className="rounded-2xl border border-dashed border-paper-edge px-4 py-8 text-center text-sm text-paper-foreground/60">
+                Every gallery photo is already in this collection.
+              </p>
+            ) : (
+              <PhotoChoiceGrid
+                photos={addablePhotos}
+                selectedIds={addSelection}
+                onToggle={(photoId) =>
+                  setAddSelection((current) =>
+                    current.includes(photoId)
+                      ? current.filter((id) => id !== photoId)
+                      : [...current, photoId],
+                  )
+                }
+                disabled={busy}
+              />
+            )}
+          </ModalShell>
+        ) : null}
+      </AnimatePresence>
 
-            setDeleteOpen(false);
-            showToast("Collection deleted successfully.");
-            router.push("/collections");
+      <AnimatePresence>
+        {deleteOpen ? (
+          <ConfirmDialog
+            title="Delete this collection?"
+            body={`“${collection.name}” will be removed. The ${count} photo${count === 1 ? "" : "s"} stay in the gallery and in every other collection.`}
+            confirmLabel="Delete collection"
+            onCancel={() => setDeleteOpen(false)}
+            onConfirm={async () => {
+              const result = await removeCollection(collection.id);
 
-            return result;
-          }}
-        />
-      ) : null}
+              // A failure keeps the dialog open, where the error is shown. A
+              // deleted collection has no page left, so this one leaves for
+              // the list; the toast is app-wide, so it outlives this page.
+              if (!result.ok) {
+                showToast(
+                  result.error ?? "That collection could not be deleted.",
+                  "error",
+                );
+                return result;
+              }
+
+              setDeleteOpen(false);
+              showToast("Collection deleted successfully.");
+              router.push("/collections");
+
+              return result;
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <PhotoLightbox
         photos={collectionPhotos}

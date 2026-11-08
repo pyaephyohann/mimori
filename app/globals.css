@@ -143,6 +143,21 @@
 }
 
 @layer base {
+  /*
+   * Mimori is a fixed-scale app. `pan-x pan-y` is the most permissive
+   * `touch-action` that still excludes zoom: panning in both axes stays
+   * available, so scrolling, the scroll-snap carousels and the photo book's
+   * vertical scroll are untouched, while pinch-to-zoom and double-tap zoom
+   * are refused at the viewport level. A surface with its own gesture sets a
+   * stricter value (`none` for a widget or sticker drag, `pan-y` for the photo
+   * book), which is allowed; nothing can widen it back to include zoom.
+   * Safari ignores `user-scalable`, so its pinch is cancelled separately in
+   * `components/pwa/zoom-guard.tsx`.
+   */
+  html {
+    touch-action: pan-x pan-y;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);

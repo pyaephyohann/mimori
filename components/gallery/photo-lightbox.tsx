@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/collections/confirm-dialog";
 import { useToast } from "@/components/toast/toast-provider";
 import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
 import { MAX_PHOTO_TITLE_LENGTH, validatePhotoTitleEdit } from "@/lib/photo-upload";
+import { lockBodyScroll, useModalMotion } from "@/lib/modal-motion";
 import type { Photo } from "@/lib/photo";
 
 import { useGalleryPhotos } from "./gallery-photos-provider";
@@ -51,17 +52,45 @@ type PhotoLightboxProps = {
  * caption and sits on the paper below the picture, so nothing is drawn over the
  * image; a photo without a caption simply shows no title line.
  */
-export function PhotoLightbox({
+export function PhotoLightbox({ photos, index, ...viewer }: PhotoLightboxProps) {
+  const photo = index === null ? undefined : photos[index];
+
+  // The viewer is always rendered so its exit can play: `AnimatePresence`
+  // keeps the card in the tree after the index is cleared and removes it when
+  // the fade and drop finish. A closed viewer renders nothing.
+  return (
+    <AnimatePresence>
+      {photo && index !== null ? (
+        <PhotoViewer
+          photos={photos}
+          index={index}
+          photo={photo}
+          {...viewer}
+        />
+      ) : null}
+    </AnimatePresence>
+  );
+}
+
+type PhotoViewerProps = Omit<PhotoLightboxProps, "photos" | "index"> & {
+  photos: readonly Photo[];
+  /** A concrete index: the viewer only exists for a photo that is open. */
+  index: number;
+  photo: Photo;
+};
+
+function PhotoViewer({
   photos,
   index,
+  photo,
   onClose,
   onNavigate,
   canSetHeroImage = false,
   canEditTitle = false,
   canDelete = false,
   onDeleted,
-}: PhotoLightboxProps) {
-  const prefersReducedMotion = useReducedMotion();
+}: PhotoViewerProps) {
+  const modal = useModalMotion("center");
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const [heroOpen, setHeroOpen] = useState(false);
@@ -92,36 +121,24 @@ export function PhotoLightbox({
     setFeedback(null);
   }
 
-  const photo = index === null ? undefined : photos[index];
-  const isOpen = photo !== undefined;
-
   // Scroll lock and focus: the close button takes focus on open, and whatever
-  // was focused before gets it back on close.
+  // was focused before gets it back when the viewer finally unmounts, after
+  // its exit animation.
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const previouslyFocused =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     closeRef.current?.focus();
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       previouslyFocused?.focus();
     };
-  }, [isOpen]);
+  }, []);
 
   useEffect(() => {
-    if (!isOpen || index === null) {
-      return;
-    }
-
     const onKeyDown = (event: KeyboardEvent) => {
       // The picker and the confirmation stacked above handle their own keys,
       // including Escape — closing them must not close the viewer too.
@@ -163,11 +180,7 @@ export function PhotoLightbox({
     window.addEventListener("keydown", onKeyDown);
 
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, heroOpen, deleteOpen, editing, index, photos.length, onClose, onNavigate]);
-
-  if (!photo || index === null) {
-    return null;
-  }
+  }, [heroOpen, deleteOpen, editing, index, photos.length, onClose, onNavigate]);
 
   // A photo may arrive without a caption at all; an absent title must render
   // nothing rather than "undefined" or a placeholder.
@@ -285,9 +298,7 @@ export function PhotoLightbox({
 
   return (
     <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+      {...modal.overlay}
       onClick={() => {
         setHeroOpen(false);
         onClose();
@@ -295,15 +306,10 @@ export function PhotoLightbox({
       className="fixed inset-0 z-[70] flex items-center justify-center bg-warm-charcoal/65 p-3 backdrop-blur-sm sm:p-6"
     >
       <motion.div
+        {...modal.panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{
-          duration: prefersReducedMotion ? 0 : 0.2,
-          ease: "easeOut",
-        }}
         onClick={(event) => event.stopPropagation()}
         className="relative flex w-full max-w-3xl flex-col rounded-[var(--polaroid-radius)] bg-paper p-2.5 pb-2 shadow-[0_30px_80px_-30px_rgba(73,52,61,0.95)] ring-1 ring-paper-edge sm:p-3 sm:pb-2.5"
       >
@@ -524,37 +530,41 @@ export function PhotoLightbox({
 
       {/* The picker is stacked above this viewer, and its clicks must not
           reach the viewer's backdrop-to-close handler. */}
-      {heroOpen && canSetHeroImage ? (
-        <div onClick={(event) => event.stopPropagation()}>
-          <HeroImagePicker
-            photo={photo}
-            onClose={() => setHeroOpen(false)}
-            onSaved={() => {
-              // A saved replacement ends the whole flow: the picker and the
-              // viewer behind it both close, and the app-wide toast confirms
-              // it after they are gone.
-              setHeroOpen(false);
-              onClose();
-              showToast("HeroCarousel image updated successfully.");
-            }}
-          />
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {heroOpen && canSetHeroImage ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <HeroImagePicker
+              photo={photo}
+              onClose={() => setHeroOpen(false)}
+              onSaved={() => {
+                // A saved replacement ends the whole flow: the picker and the
+                // viewer behind it both close, and the app-wide toast confirms
+                // it after they are gone.
+                setHeroOpen(false);
+                onClose();
+                showToast("HeroCarousel image updated successfully.");
+              }}
+            />
+          </div>
+        ) : null}
+      </AnimatePresence>
 
       {/* Stacked above the viewer for the same reason as the picker: its clicks
           and Escape must not reach the viewer behind it. */}
-      {deleteOpen && canDelete ? (
-        <div onClick={(event) => event.stopPropagation()}>
-          <ConfirmDialog
-            title="Delete this memory?"
-            body="This photo will be permanently deleted from your Gallery."
-            confirmLabel="Delete"
-            elevated
-            onCancel={() => setDeleteOpen(false)}
-            onConfirm={deletePhoto}
-          />
-        </div>
-      ) : null}
+      <AnimatePresence>
+        {deleteOpen && canDelete ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <ConfirmDialog
+              title="Delete this memory?"
+              body="This photo will be permanently deleted from your Gallery."
+              confirmLabel="Delete"
+              elevated
+              onCancel={() => setDeleteOpen(false)}
+              onConfirm={deletePhoto}
+            />
+          </div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }

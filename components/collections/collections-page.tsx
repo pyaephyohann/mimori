@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -400,33 +401,35 @@ export function CollectionsPage() {
         </svg>
       </button>
 
-      {pendingDelete ? (
-        <ConfirmDialog
-          title="Delete this collection?"
-          body={`“${pendingDelete.name}” will be removed. Its photos stay in the gallery and in every other collection — only this collection page is deleted.`}
-          confirmLabel="Delete collection"
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={async () => {
-            const result = await removeCollection(pendingDelete.id);
+      <AnimatePresence>
+        {pendingDelete ? (
+          <ConfirmDialog
+            title="Delete this collection?"
+            body={`“${pendingDelete.name}” will be removed. Its photos stay in the gallery and in every other collection — only this collection page is deleted.`}
+            confirmLabel="Delete collection"
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={async () => {
+              const result = await removeCollection(pendingDelete.id);
 
-            // A failure keeps the dialog open, where the error is shown; only a
-            // confirmed deletion closes the flow and is announced.
-            if (!result.ok) {
-              showToast(
-                result.error ?? "That collection could not be deleted.",
-                "error",
-              );
+              // A failure keeps the dialog open, where the error is shown; only
+              // a confirmed deletion closes the flow and is announced.
+              if (!result.ok) {
+                showToast(
+                  result.error ?? "That collection could not be deleted.",
+                  "error",
+                );
+                return result;
+              }
+
+              setPendingDelete(null);
+              setActionError(null);
+              showToast("Collection deleted successfully.");
+
               return result;
-            }
-
-            setPendingDelete(null);
-            setActionError(null);
-            showToast("Collection deleted successfully.");
-
-            return result;
-          }}
-        />
-      ) : null}
+            }}
+          />
+        ) : null}
+      </AnimatePresence>
 
       <PhotoLightbox
         photos={recentPhotos}

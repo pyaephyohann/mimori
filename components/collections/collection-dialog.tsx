@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -23,16 +24,18 @@ import { PhotoChoiceGrid } from "./photo-choice-grid";
 export function CollectionDialog() {
   const { dialog } = useCollections();
 
-  if (!dialog) {
-    return null;
-  }
-
+  // Always mounted, so the closing form stays in the tree for its exit while
+  // the dialog state is already gone.
   return (
-    <CollectionDialogForm
-      key={dialog.mode === "edit" ? dialog.collectionId : "create"}
-      mode={dialog.mode}
-      collectionId={dialog.mode === "edit" ? dialog.collectionId : null}
-    />
+    <AnimatePresence>
+      {dialog ? (
+        <CollectionDialogForm
+          key={dialog.mode === "edit" ? dialog.collectionId : "create"}
+          mode={dialog.mode}
+          collectionId={dialog.mode === "edit" ? dialog.collectionId : null}
+        />
+      ) : null}
+    </AnimatePresence>
   );
 }
 

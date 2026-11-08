@@ -1,10 +1,11 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 
 import { BowSticker } from "@/components/scrapbook/doodles";
+import { lockBodyScroll, useModalMotion } from "@/lib/modal-motion";
 
 type ModalShellProps = {
   title: string;
@@ -35,7 +36,9 @@ export function ModalShell({
   wide = false,
   elevated = false,
 }: ModalShellProps) {
-  const prefersReducedMotion = useReducedMotion();
+  // The sheet rises from the bottom edge on a phone and lifts into place on
+  // desktop; the owner wraps it in `AnimatePresence` so the exit plays too.
+  const modal = useModalMotion();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -44,9 +47,7 @@ export function ModalShell({
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    const previousOverflow = document.body.style.overflow;
-
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     closeRef.current?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -60,31 +61,24 @@ export function ModalShell({
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       previouslyFocused?.focus();
     };
   }, [onClose]);
 
   return (
     <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+      {...modal.overlay}
       onClick={onClose}
       className={`fixed inset-0 flex items-end justify-center bg-warm-charcoal/45 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
         elevated ? "z-[80]" : "z-[65]"
       }`}
     >
       <motion.div
+        {...modal.panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{
-          duration: prefersReducedMotion ? 0 : 0.22,
-          ease: "easeOut",
-        }}
         onClick={(event) => event.stopPropagation()}
         className={`relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-paper-edge bg-paper shadow-[0_28px_70px_-30px_rgba(73,52,61,0.9)] sm:max-h-[88vh] sm:rounded-[28px] ${
           wide ? "max-w-3xl" : "max-w-lg"

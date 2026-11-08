@@ -1,9 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import { useEffect, useId } from "react";
 
 import { BowSticker, HeartDoodle } from "@/components/scrapbook/doodles";
+import { lockBodyScroll, useModalMotion } from "@/lib/modal-motion";
 import type { BorderKey } from "@/lib/photo-booth/borders";
 import type { BoothLayout, PhotoCount } from "@/lib/photo-booth/catalog";
 
@@ -40,7 +41,7 @@ export function SetupDialog({
   onStart,
   onClose,
 }: SetupDialogProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const modal = useModalMotion();
   const titleId = useId();
 
   useEffect(() => {
@@ -50,34 +51,26 @@ export function SetupDialog({
       }
     };
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
       document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
     };
   }, [onClose]);
 
   return (
     <motion.div
-      initial={prefersReducedMotion ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: prefersReducedMotion ? 0 : 0.16 }}
+      {...modal.overlay}
       className="fixed inset-0 z-[60] flex items-end justify-center bg-warm-charcoal/45 p-0 backdrop-blur-sm sm:items-center sm:p-6"
       onClick={onClose}
     >
       <motion.div
+        {...modal.panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{
-          duration: prefersReducedMotion ? 0 : 0.22,
-          ease: "easeOut",
-        }}
         onClick={(event) => event.stopPropagation()}
         className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[28px] border border-paper-edge bg-paper shadow-[0_28px_70px_-30px_rgba(73,52,61,0.9)] sm:max-h-[88vh] sm:rounded-[28px]"
       >
