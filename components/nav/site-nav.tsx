@@ -101,15 +101,21 @@ export function SiteNav() {
         </div>
       </header>
 
-      {/* The bottom bar is docked to the bottom edge: it is the paper surface
-          itself, anchored at `bottom-0`, so nothing shows beneath it. The
+      {/* The bottom bar is docked to the bottom edge: it is the surface itself,
+          anchored at `bottom-0`, so nothing shows beneath it. The
           home-indicator inset is padding inside that surface rather than a gap
           under it, which keeps the destinations clear of the indicator while
-          the bar's background still reaches the edge of the screen — in a
-          browser and in the installed standalone PWA alike. */}
+          the bar still reaches the edge of the screen — in a browser and in
+          the installed standalone PWA alike. It is frosted glass: the app's
+          paper white at 85%, blurred and slightly saturated, with a thin white
+          top edge, so the page under it is felt rather than read. The edge is
+          an inset shadow rather than a border, so it adds no layout height and
+          the destinations stay exactly centred between the two paddings. One
+          fixed element with one backdrop filter keeps the effect cheap;
+          nothing about it animates. */}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-paper-edge bg-paper px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_-22px_rgba(73,52,61,0.9)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-paper/85 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_-12px_30px_-24px_rgba(73,52,61,0.55)] backdrop-blur-xl backdrop-saturate-150 lg:hidden"
       >
         <ul className="mx-auto grid max-w-md grid-cols-4 gap-0.5">
           {DESTINATIONS.map((destination) => (
@@ -195,8 +201,10 @@ function MobileDestination({
   transition,
 }: DestinationProps) {
   const Icon = destination.icon;
+  // A fixed 48px box with the icon and its label centred as one group, so the
+  // four destinations share the same vertical rhythm in the bar.
   const base =
-    "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[11px] font-medium";
+    "flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium";
 
   if (!destination.href) {
     return (
@@ -206,7 +214,7 @@ function MobileDestination({
         className={`${base} cursor-default text-warm-charcoal/45`}
       >
         <Icon className="h-[18px] w-[18px]" />
-        <span className="leading-tight">{destination.label}</span>
+        <span className="leading-none">{destination.label}</span>
       </span>
     );
   }
@@ -236,7 +244,7 @@ function MobileDestination({
           />
         ) : null}
       </span>
-      <span className="leading-tight">{destination.label}</span>
+      <span className="leading-none">{destination.label}</span>
     </Link>
   );
 }

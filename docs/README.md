@@ -28,6 +28,7 @@ For a new contributor or agent:
 | [DECISIONS.md](DECISIONS.md) | Log of accepted technical and product decisions with rationale. |
 | [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | Known bugs, defects and limitations. |
 | [SECURITY.md](SECURITY.md) | Security principles, requirements and current posture. |
+| [PUSH_NOTIFICATIONS.md](PUSH_NOTIFICATIONS.md) | Push notifications: how they work, VAPID keys, environment variables locally and in Vercel, two-device test. |
 | [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) | The development lifecycle agents must follow. |
 
 ## Rules for these documents

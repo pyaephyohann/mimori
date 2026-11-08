@@ -183,6 +183,26 @@ model PhotoboothShot {
   @@unique([photoId])
 }
 
+/// One browser or installed app that agreed to receive Mimori's notifications.
+///
+/// Mimori has no accounts (D-013), so a subscription is identified by the push
+/// service's own endpoint URL, which is unique per browser profile and per
+/// installed app. There is deliberately no owner column: every device that
+/// granted permission receives every notification, and the device that
+/// performed an action is excluded by its own endpoint at send time.
+model PushSubscription {
+  id             String    @id @default(cuid())
+  /// The push service endpoint. Unique, so re-subscribing updates one row.
+  endpoint       String    @unique
+  /// The subscription's public key and auth secret, used to encrypt payloads.
+  p256dh         String
+  auth           String
+  /// Null when the browser did not report an expiry.
+  expirationTime DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 /// A widget that displays a chosen set of photos.
 model Widget {
   id        String   @id @default(cuid())

@@ -6,6 +6,7 @@ import {
 } from "@/lib/collections/server";
 import { parseUpdate } from "@/lib/collections/validate";
 import { loadPhotoIdSet } from "@/lib/gallery-photos";
+import { notifyOtherDevices } from "@/lib/push/server";
 
 type CollectionRouteContext = {
   params: Promise<{ id: string }>;
@@ -76,7 +77,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: CollectionRouteContext,
 ) {
   const { id } = await params;
@@ -90,6 +91,10 @@ export async function DELETE(
         { status: 404 },
       );
     }
+
+    // Deleted, so the other devices hear about it; a missing collection above
+    // changes nothing anywhere and announces nothing.
+    notifyOtherDevices(request, "collection-deleted");
 
     return new Response(null, { status: 204 });
   } catch (error) {

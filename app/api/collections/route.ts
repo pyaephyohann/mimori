@@ -2,6 +2,7 @@ import { collectionErrorResponse } from "@/lib/collections/http";
 import { createCollection, listCollections } from "@/lib/collections/server";
 import { parseCreate } from "@/lib/collections/validate";
 import { loadPhotoIdSet } from "@/lib/gallery-photos";
+import { notifyOtherDevices } from "@/lib/push/server";
 
 export async function GET() {
   try {
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
     }
 
     const collection = await createCollection(parsed.value);
+
+    // Created, so the other devices hear about it; edits stay quiet.
+    notifyOtherDevices(request, "collection-created");
 
     return Response.json({ collection }, { status: 201 });
   } catch (error) {

@@ -391,6 +391,27 @@ Any issue documented below must have been actually observed. Do not speculate.
 - Notes / workaround: this is deliberate ([D-056](DECISIONS.md)) so the PWA keeps a fixed scale. It also removes the WCAG 1.4.4 pinch-to-200% affordance; the browser's text-size setting and the OS magnifier still work. If a future request wants zoom back, remove `maximumScale`/`userScalable`, the `html` rule and the guard together.
 - Related: [D-056](DECISIONS.md)
 
+### ISSUE-031 — The frosted mobile bar's inactive labels sit just under AA over the Hot Pink canvas
+
+- Severity: low
+- Area: navigation / accessibility
+- Status: open
+- Affected pairing: `--foreground` (`#49343D`) at 70% over the glass bar (`--paper` at 85% over `--background` `#FF69B4`, i.e. about `rgb(255,226,239)`) = **4.26:1**, measured in the running app with a 1×1 canvas composite; WCAG AA for normal text requires 4.5:1.
+- Expected: inactive destination labels readable at 11px.
+- Actual: the frosted surface lets the pink canvas tint it, so the same label that measured 4.57:1 on the solid paper bar now measures 4.26:1. The active destination's Deep Candy Pink and the 18px icons are unaffected in practice, and over white content mid-scroll the glass is lighter than the canvas case measured here.
+- Workaround: none needed for use — the labels remain legible and the app's other text-on-canvas limits are larger. The bar cannot be made opaque enough to reach 4.5:1 without losing the glass (a 0.92 white still measures 4.41:1), so the trade was made deliberately ([D-059](DECISIONS.md)).
+- Possible fix (needs approval): raise the base opacity to ~0.95, or darken the inactive label token inside the bar.
+
+## ISSUE-032 — Push notifications have not been delivered to a real browser or phone
+
+- Severity: low
+- Area: PWA / notifications
+- Status: open
+- Expected: a subscribed device shows the native **Mimori** notification when another device uploads, deletes, saves or adds something, including while the app is closed; a click focuses an open Mimori window on `/gallery`, `/collections`, `/photo-booth` or `/`.
+- Actual: the delivery path is verified only against a local HTTPS push service standing in for the browser vendors' endpoints — who is sent to, that the payload is encrypted with the subscription's key and a VAPID `Authorization` header, and that `404`/`410` rows are pruned while a failing endpoint changes nothing ([PWA-2](FEATURES.md)). This Chromium profile has `Notification.permission` **denied** and the preview tools cannot grant it, so no real `pushManager.subscribe()` could run: an actual notification appearing, its icon and wording on a device, `notificationclick` focus/navigation, background reception with Mimori closed, and iOS Home Screen (16.4+) installation were **not** observed. `PushSubscription` also does not exist in the production database yet, because the migration needs explicit approval.
+- Workaround: none needed to develop; test on two real devices as described in [PUSH_NOTIFICATIONS.md](PUSH_NOTIFICATIONS.md#testing-with-two-devices) once the migration is applied and the three VAPID variables are set locally or in Vercel.
+- Possible fix: run that two-device pass (one desktop browser plus one phone or installed PWA) and record the result; if a `NEXT_PUBLIC_*` change is made, remember a rebuild and redeploy are required before the browser sees it.
+
 ## Process
 
 - Log an issue when it is found, with reproduction steps.

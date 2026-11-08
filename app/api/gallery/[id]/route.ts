@@ -7,6 +7,7 @@ import {
 } from "@/lib/gallery-delete";
 import { GALLERY_PHOTO_KIND, toGalleryPhoto } from "@/lib/gallery-source";
 import { validatePhotoTitleEdit } from "@/lib/photo-upload";
+import { notifyOtherDevices } from "@/lib/push/server";
 
 /**
  * /api/gallery/[id] — one gallery photo.
@@ -85,13 +86,16 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: GalleryPhotoRouteContext,
 ) {
   const { id } = await params;
 
   try {
     const result = await deleteGalleryPhoto(id);
+
+    // The row is gone by now, so the other devices are told once.
+    notifyOtherDevices(request, "photo-deleted");
 
     // A warning means the photo is gone from the gallery but its file could not
     // be removed; the client says so instead of reporting a clean deletion.

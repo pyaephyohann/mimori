@@ -19,8 +19,13 @@ import { useSyncExternalStore } from "react";
  * `AnimatePresence`, which is what keeps a dialog on screen for its exit.
  */
 
-/** Out-expo: quick to start, long and soft to settle — never abrupt. */
-export const MODAL_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+/**
+ * A long, soft deceleration: most of the travel happens in the first third
+ * and the rest settles gently, so the sheet arrives rather than snapping into
+ * place. The overlay fade and the panel's movement share it, which is what
+ * keeps the two in step.
+ */
+export const MODAL_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 /**
  * Closing accelerates away instead of decelerating into nothing, so a fade
@@ -29,8 +34,11 @@ export const MODAL_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
  */
 export const MODAL_EXIT_EASE: [number, number, number, number] = [0.4, 0, 1, 1];
 
-const OPEN_SECONDS = 0.34;
-const CLOSE_SECONDS = 0.24;
+/** 400ms: slow enough to read as a deliberate arrival, still under half a second. */
+const OPEN_SECONDS = 0.4;
+
+/** Shorter than the entrance, so a dismissal stays responsive while it stays soft. */
+const CLOSE_SECONDS = 0.3;
 
 /** Tailwind's `sm`; the width at which every sheet centres and rounds. */
 const WIDE_QUERY = "(min-width: 640px)";

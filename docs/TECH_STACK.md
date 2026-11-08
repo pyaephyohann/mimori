@@ -31,6 +31,7 @@ Prisma 7 queries require a driver adapter, so `@prisma/adapter-pg` is installed 
 | `@types/node` | Node type definitions | `^20` |
 | `@types/react`, `@types/react-dom` | React type definitions | `^19` |
 | framer-motion | Animation of the hero carousel's running border and the widget desktop's drag offset and dialog transitions | `14.9.0` |
+| web-push | Server-only Web Push delivery (VAPID signing, payload encryption) for the native notifications | `^4.0.0` (with `@types/web-push` `^3.6.4`) |
 
 These come from the initial application scaffold. They are in use but are not binding product decisions.
 

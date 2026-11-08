@@ -7,10 +7,10 @@ Mimori uses **Prisma 7.10.1 with PostgreSQL** ([D-003](DECISIONS.md)). The schem
 | Item | State |
 | ---- | ----- |
 | Prisma CLI and Client | Installed, pinned at `7.10.1` (`package.json`) |
-| Schema | `prisma/schema.prisma` — 7 models, 1 enum, validated |
+| Schema | `prisma/schema.prisma` — 8 models, 1 enum, validated |
 | Prisma Client | Generated to `generated/prisma` (git-ignored) |
-| Migrations | `prisma/migrations/20261101193126_init_global_photo_system`, `prisma/migrations/20261103093000_add_collections` and `prisma/migrations/20261103091753_add_photo_booth_sessions` — all applied |
-| Database | Local PostgreSQL **18.6** database `mimori` on `localhost:5432`, reached through `DATABASE_URL` in a git-ignored `.env`. All three migrations **are applied**: every table, the `PhotoKind` enum, indexes and foreign keys exist. The `Photo` table is the application's **only** image source ([D-033](DECISIONS.md)): the gallery, the eight hero slots, collections, widgets and Recently Added all reference its rows, and no bundled pictures exist. It held no rows after the reset, and now contains only the photos and the one photobooth session created while verifying the save flow (PHOTO-8); they were not deleted. No production database exists |
+| Migrations | `prisma/migrations/20261101193126_init_global_photo_system`, `prisma/migrations/20261103093000_add_collections`, `prisma/migrations/20261103091753_add_photo_booth_sessions` and `prisma/migrations/20261109120000_add_push_subscriptions` — the first three applied; the push one was verified on a throwaway database and is **not** applied to a real database yet |
+| Database | Local PostgreSQL **18.6** database `mimori` on `localhost:5432`, reached through `DATABASE_URL` in a git-ignored `.env`. All three migrations **are applied**: every table, the `PhotoKind` enum, indexes and foreign keys exist. The `Photo` table is the application's **only** image source ([D-033](DECISIONS.md)): the gallery, the eight hero slots, collections, widgets and Recently Added all reference its rows, and no bundled pictures exist. It held no rows after the reset, and now contains only the photos and the one photobooth session created while verifying the save flow (PHOTO-8); they were not deleted. The Neon PostgreSQL database the deployment uses had the first three migrations applied on 2026-11-09 and does **not** yet have the push migration, so `PushSubscription` exists there only after an approved `prisma migrate deploy` |
 | Seed data | None |
 
 The database matches the schema exactly: `prisma migrate diff --from-config-datasource --to-schema` reports **"No difference detected"**.
@@ -175,6 +175,21 @@ Deleting a **folder never deletes photos**. This is the behaviour to preserve: `
 
 Deleting a `Photo` row on its own does not delete its Cloudinary asset: only the gallery's delete path does both, in that order ([D-011](DECISIONS.md), [D-041](DECISIONS.md)). A row removed anywhere else leaves its asset behind, which is why the gallery refuses to delete a row when Cloudinary is not configured and reports a warning when the destroy fails after the row is gone.
 
+### `PushSubscription`
+
+One browser or installed app that agreed to receive Mimori's notifications ([D-061](DECISIONS.md), [PWA-2](FEATURES.md)).
+
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| `id` | `String` | Primary key |
+| `endpoint` | `String` | The push service's own URL. **Unique** |
+| `p256dh` | `String` | The subscription's public key, used to encrypt a payload to it |
+| `auth` | `String` | The subscription's auth secret |
+| `expirationTime` | `DateTime?` | `null` when the browser reported no expiry; past rows are pruned before a send |
+| `createdAt`, `updatedAt` | `DateTime` | |
+
+There is deliberately **no owner column**: Mimori has no accounts, so a subscription is the device. The unique `endpoint` is what makes registration an upsert — a browser profile or installed app keeps one row, and re-subscribing refreshes its keys instead of adding a second device. The row is written by `POST /api/push/subscribe` and deleted by `DELETE /api/push/subscribe`, or by the server after a delivery the push service answered with `404`/`410`. The private VAPID key is never stored here; it is configuration (`VAPID_PRIVATE_KEY`).
+
 ## Unique constraints and indexes
 
 | Constraint | Type | Serves |
@@ -201,6 +216,8 @@ Deleting a `Photo` row on its own does not delete its Cloudinary asset: only the
 | `PhotoboothShot_pkey` | PK | `id` |
 | `PhotoboothShot_sessionId_position_key` | unique `(sessionId, position)` | One shot per position, preserve capture order |
 | `PhotoboothShot_photoId_key` | unique `photoId` | A capture belongs to exactly one session |
+| `PushSubscription_pkey` | PK | `id` |
+| `PushSubscription_endpoint_key` | unique | One row per device; registration upserts on it |
 
 ## Distinguishing gallery photos from Photo Booth photos
 

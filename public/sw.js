@@ -107,3 +107,101 @@ async function cacheFirst(request) {
   }
   return response;
 }
+
+/* Push notifications.
+ *
+ * The server sends one short, already-encrypted payload; this worker only
+ * displays it and decides where a click lands. Nothing in a payload is trusted
+ * beyond its text: the destination must be a path on this origin, and anything
+ * else opens the home page. Caching above is untouched by any of this.
+ */
+
+const PUSH_ICON = "/icons/icon-192.png";
+
+/** Mirrors `isSafeNotificationPath` in `lib/push/messages.ts`. */
+function safeNotificationPath(value) {
+  if (typeof value !== "string" || value.length > 2048) return "/";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  if (/[\u0000-\u001f\u007f\\\s]/.test(value)) return "/";
+
+  try {
+    const url = new URL(value, self.location.origin);
+    return url.origin === self.location.origin ? url.pathname + url.search : "/";
+  } catch {
+    return "/";
+  }
+}
+
+self.addEventListener("push", (event) => {
+  event.waitUntil(
+    (async () => {
+      let payload = null;
+
+      try {
+        payload = event.data ? event.data.json() : null;
+      } catch {
+        payload = null;
+      }
+
+      const body =
+        payload && typeof payload.body === "string" ? payload.body : "";
+      const title =
+        payload && typeof payload.title === "string" && payload.title
+          ? payload.title
+          : "Mimori";
+      const tag =
+        payload && typeof payload.tag === "string" && payload.tag
+          ? payload.tag
+          : "mimori";
+
+      await self.registration.showNotification(title, {
+        body,
+        tag,
+        icon: PUSH_ICON,
+        badge: PUSH_ICON,
+        data: { url: safeNotificationPath(payload && payload.url) },
+      });
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const target = safeNotificationPath(
+    event.notification.data && event.notification.data.url,
+  );
+
+  event.waitUntil(
+    (async () => {
+      // Prefer an open Mimori window: focus it and move it to the page the
+      // notification is about, rather than opening a second copy of the app.
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      for (const client of windows) {
+        try {
+          if (new URL(client.url).origin !== self.location.origin) continue;
+        } catch {
+          continue;
+        }
+
+        await client.focus();
+
+        if (typeof client.navigate === "function") {
+          try {
+            await client.navigate(new URL(target, self.location.origin).href);
+          } catch {
+            // Focus alone still puts the app in front of the user.
+          }
+        }
+
+        return;
+      }
+
+      await self.clients.openWindow(target);
+    })(),
+  );
+});

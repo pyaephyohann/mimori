@@ -5,6 +5,7 @@ import {
   listBoothSessions,
 } from "@/lib/photo-booth/server";
 import { parseBoothSessionInput } from "@/lib/photo-booth/session";
+import { notifyOtherDevices } from "@/lib/push/server";
 
 /**
  * /api/photo-booth — saved photobooth sessions.
@@ -47,6 +48,12 @@ export async function POST(request: Request) {
 
   try {
     const session = await createBoothSession(parsed.value);
+
+    // A new memory is stored, so the other devices hear about it once. Editing
+    // an existing booth is a save, not a new memory, and stays quiet. The print
+    // and captures were uploaded as booth photos, which never announce
+    // themselves, so this is the only notification the save produces.
+    notifyOtherDevices(request, "booth-saved");
 
     return Response.json({ session }, { status: 201 });
   } catch (error) {

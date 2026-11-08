@@ -12,6 +12,7 @@ import { HeroSlotsProvider } from "@/components/hero-slots-provider";
 import { AddWidgetDialog } from "@/components/widgets/add-widget-dialog";
 import { WidgetsProvider } from "@/components/widgets/widgets-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { PushRegistrar } from "@/components/pwa/push-registrar";
 import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { ZoomGuard } from "@/components/pwa/zoom-guard";
 
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 <CollectionsProvider>
                   <WidgetsProvider>
                     <ServiceWorkerRegister />
+                    <PushRegistrar />
                     <ZoomGuard />
                     <SiteNav />
                     <InstallPrompt />

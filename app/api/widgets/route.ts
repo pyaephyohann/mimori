@@ -1,4 +1,5 @@
 import { loadPhotoIdSet } from "@/lib/gallery-photos";
+import { notifyOtherDevices } from "@/lib/push/server";
 import { createWidget, listWidgets } from "@/lib/widgets/server";
 import { parseCreate } from "@/lib/widgets/validate";
 
@@ -37,6 +38,9 @@ export async function POST(request: Request) {
     }
 
     const widget = await createWidget(parsed.value);
+
+    // Created, so the other devices hear about it; edits stay quiet.
+    notifyOtherDevices(request, "widget-added");
 
     return Response.json({ widget }, { status: 201 });
   } catch (error) {

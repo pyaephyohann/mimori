@@ -1,5 +1,6 @@
 import { deleteImage, isCloudinaryConfigured, uploadImage } from "@/lib/cloudinary";
 import { getPrisma } from "@/lib/db";
+import { notifyOtherDevices } from "@/lib/push/server";
 import { toGalleryPhoto } from "@/lib/gallery-source";
 import {
   MAX_PHOTO_TITLE_LENGTH,
@@ -180,6 +181,14 @@ export async function POST(request: Request) {
       },
       select: { id: true, secureUrl: true, caption: true, fileName: true },
     });
+
+    // Only a gallery photo is news: booth captures are uploaded here too, and
+    // the session that saved them announces itself once, when it is stored.
+    // The row exists at this point, so the other devices are told only about
+    // an upload that actually landed.
+    if (kind === "GALLERY") {
+      notifyOtherDevices(request, "photo-uploaded");
+    }
 
     return Response.json({ photo: toGalleryPhoto(row), kind }, { status: 201 });
   } catch (error) {

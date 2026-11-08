@@ -1,4 +1,5 @@
 import { loadPhotoIdSet } from "@/lib/gallery-photos";
+import { notifyOtherDevices } from "@/lib/push/server";
 import {
   deleteWidget,
   getWidget,
@@ -55,7 +56,10 @@ export async function PATCH(request: Request, { params }: WidgetRouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: WidgetRouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: WidgetRouteContext,
+) {
   const { id } = await params;
 
   try {
@@ -64,6 +68,9 @@ export async function DELETE(_request: Request, { params }: WidgetRouteContext) 
     if (!removed) {
       return Response.json({ error: "That widget no longer exists." }, { status: 404 });
     }
+
+    // Removed, so the other devices hear about it.
+    notifyOtherDevices(request, "widget-removed");
 
     return new Response(null, { status: 204 });
   } catch (error) {
