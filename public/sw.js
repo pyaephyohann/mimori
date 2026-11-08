@@ -145,16 +145,15 @@ self.addEventListener("push", (event) => {
 
       const body =
         payload && typeof payload.body === "string" ? payload.body : "";
-      const title =
-        payload && typeof payload.title === "string" && payload.title
-          ? payload.title
-          : "Mimori";
       const tag =
         payload && typeof payload.tag === "string" && payload.tag
           ? payload.tag
           : "mimori";
 
-      await self.registration.showNotification(title, {
+      // The title stays empty on purpose: the operating system already
+      // attributes the notification to Mimori, so repeating the name here
+      // would show it twice. The message is the only line Mimori adds.
+      await self.registration.showNotification("", {
         body,
         tag,
         icon: PUSH_ICON,
