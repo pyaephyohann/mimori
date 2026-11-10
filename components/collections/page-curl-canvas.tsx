@@ -18,6 +18,32 @@ import type { Photo } from "@/lib/photo";
  * own rAF loop so pointer drags don't re-render React at 60fps.
  */
 
+/**
+ * The two families a stationary page is set in, read from the same
+ * `next/font` tokens the DOM pages use (`--font-caveat`, `--font-roboto`
+ * resolve to the family `next/font` actually serves, followed by its own
+ * metric fallback). A canvas must be told a family explicitly, so the sheet
+ * used to fall back to Georgia — a visibly different face from the printed
+ * page it was replacing. Reading the computed tokens is how the photobooth
+ * print already asks for the same two faces.
+ */
+type PageFonts = { script: string; body: string };
+
+function pageFonts(): PageFonts {
+  if (typeof window === "undefined") {
+    return { script: "cursive", body: "sans-serif" };
+  }
+
+  const root = getComputedStyle(document.documentElement);
+  const read = (name: string, fallback: string) =>
+    root.getPropertyValue(name).trim() || fallback;
+
+  return {
+    script: `${read("--font-caveat", "cursive")}, "Bradley Hand", "Segoe Script", cursive`,
+    body: `${read("--font-roboto", "sans-serif")}, ui-sans-serif, system-ui, sans-serif`,
+  };
+}
+
 export type CurlHandle = {
   /** progress: 0 = sheet flat on the right, 1 = flat on the left. */
   draw: (progress: number, grabY: number) => void;
@@ -153,11 +179,19 @@ function paintPaper(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
+  /** Device pixels per CSS px: the texture is `scale`× oversampled and then
+   *  drawn back 1/`scale` smaller, so type has to be sized in CSS px and
+   *  multiplied up, exactly like the geometry around it. */
+  scale: number,
+  fonts: PageFonts,
   photo: Photo | undefined,
   img: HTMLImageElement | null,
   side: "right" | "left",
   pageNumber: string,
 ) {
+  // The page's own width, in the CSS px the DOM page is laid out in.
+  const pageCssWidth = w / scale;
+  const captionSize = Math.max(12, pageCssWidth * 0.045) * scale;
   ctx.save();
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "#FCF5F7";
@@ -177,9 +211,9 @@ function paintPaper(
     const bottom = h * 0.82;
     const boxW = w - padX * 2;
     const boxH = bottom - top;
-    const scale = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
-    const dw = img.naturalWidth * scale;
-    const dh = img.naturalHeight * scale;
+    const fit = Math.min(boxW / img.naturalWidth, boxH / img.naturalHeight);
+    const dw = img.naturalWidth * fit;
+    const dh = img.naturalHeight * fit;
     const dx = padX + (boxW - dw) / 2;
     const dy = top + (boxH - dh) / 2;
     ctx.save();
@@ -191,25 +225,31 @@ function paintPaper(
 
     const caption = photo.caption.trim();
     if (caption) {
-      ctx.fillStyle = "rgba(90,60,70,0.85)";
-      ctx.font = `${Math.max(11, w * 0.052)}px Georgia, serif`;
+      // Same face, weight, size and tone as the caption on the page below:
+      // `font-decorative` (Caveat) at `max(12, pageWidth * 0.045)` in
+      // `text-paper-foreground/75`.
+      ctx.fillStyle = "rgba(73,52,61,0.75)";
+      ctx.font = `400 ${captionSize}px ${fonts.script}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(caption.slice(0, 64), w / 2, h * 0.9, w * 0.84);
     }
   } else if (!photo) {
-    ctx.fillStyle = "rgba(120,85,95,0.5)";
-    ctx.font = `${Math.max(20, w * 0.1)}px Georgia, serif`;
+    // The empty leaf's “The end” is set the same way the DOM page sets it.
+    ctx.fillStyle = "rgba(73,52,61,0.35)";
+    ctx.font = `400 ${pageCssWidth * 0.09 * scale}px ${fonts.script}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("♡", w / 2, h * 0.44);
-    ctx.font = `${Math.max(11, w * 0.05)}px Georgia, serif`;
+    ctx.font = `400 ${captionSize}px ${fonts.script}`;
     ctx.fillText("The end", w / 2, h * 0.54);
   }
 
   if (pageNumber) {
-    ctx.fillStyle = "rgba(90,60,70,0.4)";
-    ctx.font = "10px system-ui, sans-serif";
+    // The folio is body text on the page (`text-[10px]`), so it is 10 CSS px
+    // here — not 10 texture px, which the draw step would show at 10/scale.
+    ctx.fillStyle = "rgba(73,52,61,0.4)";
+    ctx.font = `400 ${10 * scale}px ${fonts.body}`;
     ctx.textAlign = side === "left" ? "left" : "right";
     ctx.textBaseline = "alphabetic";
     ctx.fillText(pageNumber, side === "left" ? w * 0.08 : w * 0.92, h * 0.975);
@@ -288,6 +328,7 @@ const PageCurlCanvas = forwardRef<CurlHandle, Props>(function PageCurlCanvas(
 
     let cancelled = false;
     const release: Array<() => void> = [];
+    const fonts = pageFonts();
 
     const repaint = () => {
       if (cancelled) return;
@@ -312,6 +353,8 @@ const PageCurlCanvas = forwardRef<CurlHandle, Props>(function PageCurlCanvas(
           fctx,
           w,
           h,
+          s,
+          fonts,
           front,
           frontSource?.status === "ready" ? frontSource.img : null,
           frontSide,
@@ -324,6 +367,8 @@ const PageCurlCanvas = forwardRef<CurlHandle, Props>(function PageCurlCanvas(
           bctx,
           w,
           h,
+          s,
+          fonts,
           back,
           backSource?.status === "ready" ? backSource.img : null,
           frontSide === "right" ? "left" : "right",
@@ -350,6 +395,24 @@ const PageCurlCanvas = forwardRef<CurlHandle, Props>(function PageCurlCanvas(
     });
 
     repaint();
+
+    // `next/font` ships Caveat lazily, so a sheet painted before it arrives
+    // would keep the fallback face for the whole turn. Wait for it and repaint
+    // the same two textures once, the way an arriving photo completes a sheet.
+    if (typeof document !== "undefined" && document.fonts) {
+      const spec = `400 ${Math.max(12, pageWidth * 0.045)}px ${fonts.script}`;
+
+      if (!document.fonts.check(spec)) {
+        document.fonts
+          .load(spec)
+          .then(() => {
+            if (!cancelled) repaint();
+          })
+          .catch(() => {
+            // A face that cannot load keeps the fallback; the page still turns.
+          });
+      }
+    }
 
     return () => {
       cancelled = true;
